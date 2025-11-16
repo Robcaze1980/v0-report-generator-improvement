@@ -9,10 +9,10 @@
     "start": "next start"
   },
   "dependencies": {
-    "@radix-ui/react-dialog": "^1.0.5",
-    "@radix-ui/react-label": "^2.0.2",
-    "@radix-ui/react-select": "^2.0.0",
-    "@radix-ui/react-slot": "^1.0.2",
+    "@radix-ui/react-dialog": "latest",
+    "@radix-ui/react-label": "latest",
+    "@radix-ui/react-select": "latest",
+    "@radix-ui/react-slot": "latest",
     "@vercel/analytics": "latest",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -20,6 +20,7 @@
     "jspdf": "latest",
     "lucide-react": "^0.454.0",
     "next": "^14.0.0",
+    "next-themes": "latest",
     "nodemailer": "latest",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
