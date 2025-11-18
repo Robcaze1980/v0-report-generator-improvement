@@ -1583,7 +1583,7 @@ export default function ReportGenerator() {
               report.
             </p>
           </div>
-          <div className="space-y-3">
+          <div className="space-y-3 bg-white p-4 rounded-lg">
             {savedInspections.length === 0 ? (
               <p className="text-center text-gray-500 py-8">
                 No saved inspections found. Save your current inspection to see it here.
@@ -1592,7 +1592,7 @@ export default function ReportGenerator() {
               savedInspections.map((insp) => (
                 <div
                   key={insp.id}
-                  className="border rounded-lg p-4 flex justify-between items-start hover:bg-gray-50 transition-colors"
+                  className="border rounded-lg p-4 flex justify-between items-start hover:bg-gray-50 transition-colors bg-white"
                 >
                   <div className="flex-1">
                     <h3 className="font-semibold text-lg">{insp.address}</h3>
