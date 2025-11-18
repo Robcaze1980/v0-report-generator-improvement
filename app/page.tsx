@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { X, StopCircle } from "lucide-react"
+import { X, StopCircle } from 'lucide-react'
 import {
   translateSpanishToEnglish,
   transcribeAudioWithWhisper,
@@ -1009,7 +1009,8 @@ export default function ReportGenerator() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        {/* CHANGE: Made grid responsive: single column on mobile, two columns on large screens */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Builder */}
           <div className="space-y-6">
             {/* Company */}
@@ -1363,8 +1364,9 @@ export default function ReportGenerator() {
           </div>
 
           {/* Preview */}
-          <div className="xl:sticky xl:top-6 xl:h-[calc(100vh-3rem)]">
-            <Card className="p-4 sm:p-6 overflow-auto xl:h-full">
+          {/* CHANGE: Fixed preview visibility: removed xl-only classes, made it responsive on all screen sizes */}
+          <div className="lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)]">
+            <Card className="p-4 sm:p-6 overflow-auto lg:h-full">
               <h2 className="text-xl font-semibold mb-4">Preview</h2>
               <div ref={previewRef} style={{ backgroundColor: "#ffffff", color: "#111827", padding: "24px" }}>
                 {/* Header */}
