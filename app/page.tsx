@@ -666,27 +666,25 @@ export default function ReportGenerator() {
     if (!values.address?.trim() || !values.sections || values.sections.length === 0) return null
 
     try {
-      // Ensure all required values have safe defaults
       const pdfData = {
-        company: values.company || "EHL Roofing LLC",
-        license: values.license || "CA #1145092",
-        logo: values.logo || "/ehl-logo.png",
-        customerName: values.customerName || "",
-        customerEmail: values.customerEmail || "",
-        address: values.address || "",
-        date: values.date || new Date().toISOString().split("T")[0],
-        inspector: values.inspector || "Lester Herrera H.",
-        estimator: values.estimator || " Robertson Carrillo Z.",
+        company: String(values.company || "EHL Roofing LLC"),
+        license: String(values.license || "CA #1145092"),
+        logo: String(values.logo || "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/EHL%20%284%29-P3jjzUnqzwKlyThpWcRe641AhPFonu.png"),
+        customerName: String(values.customerName || ""),
+        customerEmail: String(values.customerEmail || ""),
+        address: String(values.address || ""),
+        date: String(values.date || new Date().toISOString().split("T")[0]),
+        inspector: String(values.inspector || "Lester Herrera H."),
+        estimator: String(values.estimator || " Robertson Carrillo Z."),
         sections: (values.sections || []).map(s => ({
-          ...s,
-          id: s.id || crypto.randomUUID(),
-          issue: s.issue || "No issue specified",
-          title: s.title || s.issue || "Untitled",
-          description: s.description || "No description provided",
-          severity: s.severity || "Medium",
-          photos: (s.photos || []).filter(p => p && p.trim() !== ""),
+          id: String(s.id || crypto.randomUUID()),
+          issue: String(s.issue || "No issue specified"),
+          title: String(s.title || s.issue || "Untitled"),
+          description: String(s.description || "No description provided"),
+          severity: String(s.severity || "Medium"),
+          photos: Array.isArray(s.photos) ? s.photos.filter(p => p && typeof p === 'string' && p.trim() !== "") : [],
         })),
-        finalNotes: values.finalNotes || "",
+        finalNotes: String(values.finalNotes || ""),
       }
 
       console.log("[v0] Generating PDF with data:", {

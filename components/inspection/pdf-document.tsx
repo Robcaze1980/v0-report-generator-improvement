@@ -1,5 +1,5 @@
 import React from "react"
-import { Document, Page, Text, View, Image, StyleSheet, Font } from "@react-pdf/renderer"
+import { Document, Page, Text, View, Image, StyleSheet } from "@react-pdf/renderer"
 import type { Section } from "@/lib/types"
 import { formatDescription } from "@/lib/utils/validation"
 
@@ -164,18 +164,26 @@ export const InspectionPDF = ({
   sections,
   finalNotes,
 }: PDFDocumentProps) => {
-  // Ensure all values are safely defined
-  const safeCompany = company || "EHL Roofing LLC"
-  const safeLicense = license || ""
-  const safeLogo = logo || "/ehl-logo.png"
-  const safeCustomerName = customerName || ""
-  const safeCustomerEmail = customerEmail || ""
-  const safeAddress = address || ""
-  const safeDate = date || ""
-  const safeInspector = inspector || ""
-  const safeEstimator = estimator || ""
-  const safeSections = sections || []
-  const safeFinalNotes = finalNotes || ""
+  const getAbsoluteUrl = (path: string): string => {
+    if (!path) return ""
+    if (path.startsWith("http://") || path.startsWith("https://") || path.startsWith("data:")) {
+      return path
+    }
+    // For relative paths, use a placeholder since we can't access window in server context
+    return `https://hebbkx1anhila5yf.public.blob.vercel-storage.com/EHL%20%284%29-P3jjzUnqzwKlyThpWcRe641AhPFonu.png`
+  }
+
+  const safeCompany = String(company || "EHL Roofing LLC")
+  const safeLicense = String(license || "")
+  const safeLogo = getAbsoluteUrl(logo)
+  const safeCustomerName = String(customerName || "")
+  const safeCustomerEmail = String(customerEmail || "")
+  const safeAddress = String(address || "")
+  const safeDate = String(date || "")
+  const safeInspector = String(inspector || "")
+  const safeEstimator = String(estimator || "")
+  const safeSections = Array.isArray(sections) ? sections : []
+  const safeFinalNotes = String(finalNotes || "")
 
   return (
     <Document>
@@ -183,11 +191,14 @@ export const InspectionPDF = ({
         {/* Header */}
         <View style={styles.header}>
           {safeLogo && (
-            <Image src={safeLogo || "/placeholder.svg"} style={styles.logo} />
+            <Image 
+              src={safeLogo || "/placeholder.svg"} 
+              style={styles.logo}
+            />
           )}
           <View style={styles.headerText}>
-            <Text style={styles.title}>Roof Inspection Report — {safeCompany}</Text>
-            <Text style={styles.subtitle}>License: {safeLicense}</Text>
+            <Text style={styles.title}>{`Roof Inspection Report — ${safeCompany}`}</Text>
+            <Text style={styles.subtitle}>{`License: ${safeLicense}`}</Text>
           </View>
         </View>
 
@@ -245,19 +256,21 @@ export const InspectionPDF = ({
             <Text style={[styles.sectionTitle, { marginBottom: 15 }]}>Inspection Findings</Text>
             {safeSections.map((s, i) => {
               const safeSection = {
-                id: s?.id || `section-${i}`,
-                issue: s?.issue || "No issue specified",
-                title: s?.title || s?.issue || "Untitled",
-                description: s?.description || "No description provided",
-                severity: s?.severity || "Medium",
-                photos: (s?.photos || []).filter(p => p && typeof p === 'string' && p.trim() !== ""),
+                id: String(s?.id || `section-${i}`),
+                issue: String(s?.issue || "No issue specified"),
+                title: String(s?.title || s?.issue || "Untitled"),
+                description: String(s?.description || "No description provided"),
+                severity: String(s?.severity || "Medium"),
+                photos: Array.isArray(s?.photos) 
+                  ? s.photos.filter(p => p && typeof p === 'string' && p.trim() !== "").map(p => getAbsoluteUrl(p))
+                  : [],
               }
               
               return (
                 <View key={safeSection.id} style={styles.finding} wrap={false}>
                   <View style={styles.findingHeader}>
                     <Text style={styles.findingTitle}>
-                      {i + 1}. {safeSection.title}
+                      {`${i + 1}. ${safeSection.title}`}
                     </Text>
                     <Text style={[styles.severityBadge, { backgroundColor: getSeverityColor(safeSection.severity) }]}>
                       {safeSection.severity}
@@ -266,8 +279,12 @@ export const InspectionPDF = ({
                   <Text style={styles.description}>{formatDescription(safeSection.description)}</Text>
                   {safeSection.photos.length > 0 && (
                     <View style={styles.photoGrid}>
-                      {safeSection.photos.map((p, j) => (
-                        <Image key={j} src={p || "/placeholder.svg"} style={styles.photo} />
+                      {safeSection.photos.map((photoUrl, j) => (
+                        <Image 
+                          key={`photo-${i}-${j}`} 
+                          src={photoUrl || "/placeholder.svg"} 
+                          style={styles.photo}
+                        />
                       ))}
                     </View>
                   )}
@@ -279,7 +296,7 @@ export const InspectionPDF = ({
 
         {/* Footer */}
         <Text style={styles.footer} fixed>
-          Prepared by {safeEstimator}. © {new Date().getFullYear()} {safeCompany}. All rights reserved.
+          {`Prepared by ${safeEstimator}. © ${new Date().getFullYear()} ${safeCompany}. All rights reserved.`}
         </Text>
       </Page>
     </Document>
