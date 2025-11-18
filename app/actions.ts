@@ -1,4 +1,3 @@
-// app/actions.ts - FIXED VERSION
 "use server"
 
 import nodemailer from "nodemailer"
@@ -17,13 +16,16 @@ export async function generateDescriptionWithAI(issue: string, severity: Severit
     }
   }
 
-  const prompt = `You are a professional roofing inspector. Write a technical, concise description for this roofing issue.
+  const prompt = `You are a professional roofing inspector. Based on this roofing issue, generate BOTH a professional title and a technical description.
 
 Issue (${severity} severity): ${issue}
 
 CRITICAL REQUIREMENT: Write EXCLUSIVELY in English. Do NOT use any Spanish words, phrases, or terminology under any circumstances. The reader only understands English.
 
-Format with exactly TWO SEPARATE PARAGRAPHS with a blank line between them:
+FORMAT YOUR RESPONSE EXACTLY LIKE THIS:
+
+TITLE:
+[Write a concise, professional title for this issue. 5-10 words maximum. Use Title Case. Be specific and clear.]
 
 OBSERVED CONDITION:
 [Precise technical observation in English. 2-3 sentences.]
@@ -43,7 +45,7 @@ Use professional roofing terminology in English only. No markdown. Each section 
       body: JSON.stringify({
         model: "gpt-4o-mini",
         messages: [{ role: "user", content: prompt }],
-        max_tokens: 250,
+        max_tokens: 300,
         temperature: 0.7,
       }),
     })
@@ -54,15 +56,21 @@ Use professional roofing terminology in English only. No markdown. Each section 
     }
 
     const data = await response.json()
-    let desc = data.choices[0]?.message?.content?.trim() || ""
+    let fullText = data.choices[0]?.message?.content?.trim() || ""
 
-    desc = desc
+    const titleMatch = fullText.match(/TITLE:\s*\n(.+?)(?=\n\nOBSERVED|$)/is)
+    const title = titleMatch ? titleMatch[1].trim() : ""
+
+    // Remove title section from description
+    let description = fullText.replace(/TITLE:\s*\n.+?\n\n/is, "")
+
+    description = description
       .replace(/observed condition:/gi, "OBSERVED CONDITION:")
       .replace(/potential impact if unaddressed:/gi, "POTENTIAL IMPACT IF UNADDRESSED:")
       .replace(/\*\*/g, "")
       .replace(/(OBSERVED CONDITION:[^\n]+(?:\n[^\n]+)*?)\n+(POTENTIAL IMPACT)/gi, "$1\n\n$2")
 
-    return { success: true, description: desc }
+    return { success: true, title, description }
   } catch (err) {
     console.error("[EHL] Description generation error:", err)
     return { success: false, error: "Failed to generate description" }
@@ -638,7 +646,7 @@ export interface InspectionData {
   inspector: string
   estimator: string
   logo: string | null
-  sections: Array<{ id: string; issue: string; description: string; severity: string; photos: string[] }>
+  sections: Array<{ id: string; issue: string; title?: string; description: string; severity: string; photos: string[] }>
   finalNotes?: string
 }
 

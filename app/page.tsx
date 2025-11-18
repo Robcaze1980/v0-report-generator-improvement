@@ -35,6 +35,7 @@ type Severity = "Critical" | "High" | "Medium" | "Low"
 type Section = {
   id: string
   issue: string
+  title?: string  // Added optional title field
   description: string
   severity: Severity
   photos: string[]
@@ -79,6 +80,7 @@ export default function ReportGenerator() {
   const [currentSection, setCurrentSection] = useState<Section>({
     id: "",
     issue: "",
+    title: "",  // Added title to initial state
     description: "",
     severity: "Medium",
     photos: [],
@@ -327,8 +329,12 @@ export default function ReportGenerator() {
     try {
       const result = await generateDescriptionWithAI(currentSection.issue, currentSection.severity)
       if (result.success && result.description) {
-        setCurrentSection((prev) => ({ ...prev, description: result.description }))
-        showToast("Description generated with AI", "success")
+        setCurrentSection((prev) => ({
+          ...prev,
+          title: result.title || prev.issue,  // Fallback to issue if no title
+          description: result.description
+        }))
+        showToast("Title and description generated with AI", "success")
       } else {
         showToast(result.error || "Failed to generate description. Please try again.", "error")
       }
@@ -554,13 +560,18 @@ export default function ReportGenerator() {
     try {
       // Translate and validate
       const translatedIssue = await translateSpanishToEnglish(currentSection.issue)
+      const translatedTitle = currentSection.title
+        ? await translateSpanishToEnglish(currentSection.title)
+        : translatedIssue
       const translatedDescription = await translateSpanishToEnglish(currentSection.description)
 
       // Validación final: asegurar que no hay español
       const spanishDetector =
         /[áéíóúñ¿¡]|inexistente|dañado|roto|corrosión|tejas(?!\w)|techo(?!\w)|goteras|canaleta|tapajunta|chimenea|humedad|moho/i
 
-      if (spanishDetector.test(translatedIssue) || spanishDetector.test(translatedDescription)) {
+      if (spanishDetector.test(translatedIssue) ||
+          spanishDetector.test(translatedTitle) ||
+          spanishDetector.test(translatedDescription)) {
         throw new Error("Translation incomplete - Spanish words detected. Please try again.")
       }
 
@@ -571,11 +582,18 @@ export default function ReportGenerator() {
         .trim()
         .replace(/^(.)/, (c) => c.toUpperCase())
 
+      const cleanTitle = translatedTitle
+        .replace(/["""]/g, "")
+        .replace(/\s+/g, " ")
+        .trim()
+        .replace(/^(.)/, (c) => c.toUpperCase())
+
       const cleanDescription = translatedDescription.replace(/["""]/g, "").replace(/\s+/g, " ").trim()
 
       const sectionToAdd = {
         ...currentSection,
         issue: cleanIssue,
+        title: cleanTitle,  // Include title in section
         description: cleanDescription,
         id: currentSection.id || crypto.randomUUID(),
       }
@@ -592,6 +610,7 @@ export default function ReportGenerator() {
       setCurrentSection({
         id: "",
         issue: "",
+        title: "",  // Reset title
         description: "",
         severity: "Medium",
         photos: [],
@@ -616,6 +635,7 @@ export default function ReportGenerator() {
     setCurrentSection({
       id: "",
       issue: "",
+      title: "",  // Reset title
       description: "",
       severity: "Medium",
       photos: [],
@@ -744,6 +764,10 @@ export default function ReportGenerator() {
       }
       if (spanishDetector.test(section.description)) {
         issues.push(`Section ${index + 1} Description contains Spanish`)
+      }
+      // Validate title as well
+      if (section.title && spanishDetector.test(section.title)) {
+        issues.push(`Section ${index + 1} Title contains Spanish`)
       }
     })
 
@@ -1099,6 +1123,7 @@ export default function ReportGenerator() {
                       value={currentSection.issue}
                       onChange={(e) => setCurrentSection({ ...currentSection, issue: e.target.value })}
                       className="flex-1"
+                      placeholder="Describe el daño observado..."
                     />
                     {!isRecordingIssue && !isTranscribingIssue && (
                       <Button onClick={startRecordingIssue} variant="outline" size="sm">
@@ -1122,7 +1147,25 @@ export default function ReportGenerator() {
                       </Button>
                     )}
                   </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Describe el daño. La IA generará un título profesional y descripción técnica.
+                  </p>
                 </div>
+
+                {currentSection.title && (
+                  <div>
+                    <Label>Título Generado por IA</Label>
+                    <Input
+                      value={currentSection.title}
+                      onChange={(e) => setCurrentSection({ ...currentSection, title: e.target.value })}
+                      className="font-semibold"
+                      placeholder="El título se generará automáticamente..."
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Puedes editar el título generado por la IA si lo deseas.
+                    </p>
+                  </div>
+                )}
 
                 <div>
                   <div className="flex justify-between items-center mb-2">
@@ -1133,13 +1176,14 @@ export default function ReportGenerator() {
                       variant="outline"
                       disabled={isGeneratingDesc || !currentSection.issue.trim()}
                     >
-                      {isGeneratingDesc ? "Generating..." : "Generate with AI"}
+                      {isGeneratingDesc ? "Generating..." : "✨ Generate Title + Description with AI"}
                     </Button>
                   </div>
                   <Textarea
                     value={currentSection.description}
                     onChange={(e) => setCurrentSection({ ...currentSection, description: e.target.value })}
                     rows={5}
+                    placeholder="La descripción técnica se generará automáticamente..."
                   />
                 </div>
 
@@ -1216,11 +1260,14 @@ export default function ReportGenerator() {
                     <div key={s.id} className="border rounded-lg p-3">
                       <div className="flex justify-between items-start mb-2">
                         <div className="flex-1">
-                          <h3 className="font-semibold">
-                            {i + 1}. {s.issue}
+                          <h3 className="font-semibold text-lg">
+                            {i + 1}. {s.title || s.issue}
                           </h3>
+                          {s.title && s.title !== s.issue && (
+                            <p className="text-xs text-gray-500 mt-0.5">Observación: {s.issue}</p>
+                          )}
                           <span
-                            className={`text-xs px-2 py-1 rounded-full ${
+                            className={`text-xs px-2 py-1 rounded-full inline-block mt-1 ${
                               s.severity === "Critical"
                                 ? "bg-red-100 text-red-800"
                                 : s.severity === "High"
@@ -1453,7 +1500,7 @@ export default function ReportGenerator() {
                             }}
                           >
                             <h3 style={{ fontSize: "16px", fontWeight: "600" }}>
-                              {i + 1}. {s.issue}
+                              {i + 1}. {s.title || s.issue}
                             </h3>
                             <span
                               style={{
