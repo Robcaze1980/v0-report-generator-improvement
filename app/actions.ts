@@ -620,6 +620,7 @@ export async function sendReportEmail({
 const BASEROW_API_URL = (process.env.BASEROW_API_URL || "https://api.baserow.io").trim()
 const BASEROW_TOKEN = process.env.BASEROW_API_TOKEN
 const TABLE_ID = process.env.BASEROW_TABLE_ID || "733936"
+const LOGS_TABLE_ID = process.env.BASEROW_LOGS_TABLE_ID || "0" // Set this in your env vars
 
 const FIELDS = {
   CUSTOMER_NAME: "field_6173181",
@@ -636,6 +637,14 @@ const FIELDS = {
   FINAL_NOTES: "field_6173195",
 }
 
+const LOG_FIELDS = {
+  MESSAGE: "field_error_message", // Replace with actual field ID
+  CONTEXT: "field_error_context", // Replace with actual field ID
+  STACK: "field_error_stack", // Replace with actual field ID
+  METADATA: "field_error_metadata", // Replace with actual field ID
+  TIMESTAMP: "field_error_timestamp", // Replace with actual field ID
+}
+
 export interface InspectionData {
   company: string
   license: string
@@ -648,6 +657,84 @@ export interface InspectionData {
   logo: string | null
   sections: Array<{ id: string; issue: string; title?: string; description: string; severity: string; photos: string[] }>
   finalNotes?: string
+}
+
+async function fetchWithRetry(url: string, options: RequestInit, retries = 3, backoff = 1000) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const res = await fetch(url, options)
+
+      // If successful, return response
+      if (res.ok) return res
+
+      // If server error (5xx), throw to trigger retry
+      if (res.status >= 500 && res.status < 600) {
+        throw new Error(`Server error: ${res.status}`)
+      }
+
+      // If client error (4xx), don't retry, just return res to be handled by caller
+      return res
+    } catch (err) {
+      // If last retry, throw the error
+      if (i === retries - 1) throw err
+      
+      // Wait before retrying (exponential backoff)
+      await new Promise((resolve) => setTimeout(resolve, backoff * Math.pow(2, i)))
+    }
+  }
+  throw new Error("Max retries exceeded")
+}
+
+async function parseErrorResponse(res: Response) {
+  try {
+    const contentType = res.headers.get("content-type")
+    if (contentType && contentType.includes("application/json")) {
+      const data = await res.json()
+      return data.detail || data.error || `Request failed with status ${res.status}`
+    }
+    // If not JSON (e.g. HTML 502 page), return status text
+    const text = await res.text()
+    return `Request failed (${res.status}): ${text.substring(0, 100)}...`
+  } catch (e) {
+    return `Request failed with status ${res.status}`
+  }
+}
+
+export async function logError({
+  message,
+  context,
+  error,
+  metadata,
+}: {
+  message: string
+  context: string
+  error?: any
+  metadata?: any
+}) {
+  const timestamp = new Date().toISOString()
+  const stack = error instanceof Error ? error.stack : String(error)
+  const errorMessage = error instanceof Error ? error.message : String(error || message)
+
+  console.error(`[EHL Error] [${context}] ${message}`, error)
+
+  // If no logs table configured, stop here
+  if (!BASEROW_TOKEN || LOGS_TABLE_ID === "0") return
+
+  try {
+    await fetch(`${BASEROW_API_URL}/api/database/rows/table/${LOGS_TABLE_ID}/`, {
+      method: "POST",
+      headers: { Authorization: `Token ${BASEROW_TOKEN}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        [LOG_FIELDS.MESSAGE]: errorMessage,
+        [LOG_FIELDS.CONTEXT]: context,
+        [LOG_FIELDS.STACK]: stack,
+        [LOG_FIELDS.METADATA]: JSON.stringify(metadata || {}),
+        [LOG_FIELDS.TIMESTAMP]: timestamp,
+      }),
+    })
+  } catch (logErr) {
+    console.error("[EHL] Failed to send error log to Baserow:", logErr)
+  }
 }
 
 export async function saveInspectionToBaserow(data: InspectionData) {
@@ -673,18 +760,23 @@ export async function saveInspectionToBaserow(data: InspectionData) {
   }
 
   try {
-    const res = await fetch(`${BASEROW_API_URL}/api/database/rows/table/${TABLE_ID}/`, {
+    const res = await fetchWithRetry(`${BASEROW_API_URL}/api/database/rows/table/${TABLE_ID}/`, {
       method: "POST",
       headers: { Authorization: `Token ${BASEROW_TOKEN}`, "Content-Type": "application/json" },
       body: JSON.stringify(row),
     })
+
+    if (!res.ok) {
+      const errorMsg = await parseErrorResponse(res)
+      throw new Error(errorMsg)
+    }
+
     const result = await res.json()
-    if (!res.ok) throw new Error(result.detail || "Save failed")
     console.log("[EHL] Inspection saved to Baserow:", result.id)
     return { success: true, id: result.id }
   } catch (err) {
     console.error("[EHL] Baserow save error:", err)
-    return { success: false, error: "Failed to save to Baserow" }
+    return { success: false, error: err instanceof Error ? err.message : "Failed to save to Baserow" }
   }
 }
 
@@ -692,11 +784,16 @@ export async function loadInspectionFromBaserow(id: number) {
   if (!BASEROW_TOKEN) return { success: false, error: "Baserow token missing" }
 
   try {
-    const res = await fetch(`${BASEROW_API_URL}/api/database/rows/table/${TABLE_ID}/${id}/`, {
+    const res = await fetchWithRetry(`${BASEROW_API_URL}/api/database/rows/table/${TABLE_ID}/${id}/`, {
       headers: { Authorization: `Token ${BASEROW_TOKEN}` },
     })
+    
+    if (!res.ok) {
+      const errorMsg = await parseErrorResponse(res)
+      throw new Error(errorMsg)
+    }
+
     const row = await res.json()
-    if (!res.ok) throw new Error("Load failed")
 
     const data: InspectionData = {
       company: row[FIELDS.COMPANY_NAME] || "EHL Roofing LLC",
@@ -707,7 +804,7 @@ export async function loadInspectionFromBaserow(id: number) {
       date: row[FIELDS.INSPECTION_DATE] || "",
       inspector: row[FIELDS.INSPECTOR_NAME] || "",
       estimator: row[FIELDS.ESTIMATOR_NAME] || "",
-      logo: row[FIELDS.COMPANY_LOGO_URL] || null,
+      logo: row[FIELDS.COMPANY_LOGO_URL] || "/ehl-logo.png",
       sections: JSON.parse(row[FIELDS.SECTIONS_JSON] || "[]"),
       finalNotes: row[FIELDS.FINAL_NOTES] || "",
     }
@@ -722,11 +819,16 @@ export async function listInspectionsFromBaserow() {
   if (!BASEROW_TOKEN) return { success: false, error: "Baserow token missing", inspections: [] }
 
   try {
-    const res = await fetch(`${BASEROW_API_URL}/api/database/rows/table/${TABLE_ID}/?size=50`, {
+    const res = await fetchWithRetry(`${BASEROW_API_URL}/api/database/rows/table/${TABLE_ID}/?size=50`, {
       headers: { Authorization: `Token ${BASEROW_TOKEN}` },
     })
+    
+    if (!res.ok) {
+      const errorMsg = await parseErrorResponse(res)
+      throw new Error(errorMsg)
+    }
+
     const result = await res.json()
-    if (!res.ok) throw new Error("List failed")
 
     const inspections = result.results.map((r: any) => ({
       id: r.id,
@@ -747,11 +849,16 @@ export async function deleteInspectionFromBaserow(id: number) {
   if (!BASEROW_TOKEN) return { success: false, error: "Baserow token missing" }
 
   try {
-    const res = await fetch(`${BASEROW_API_URL}/api/database/rows/table/${TABLE_ID}/${id}/`, {
+    const res = await fetchWithRetry(`${BASEROW_API_URL}/api/database/rows/table/${TABLE_ID}/${id}/`, {
       method: "DELETE",
       headers: { Authorization: `Token ${BASEROW_TOKEN}` },
     })
-    if (!res.ok) throw new Error("Delete failed")
+    
+    if (!res.ok) {
+      const errorMsg = await parseErrorResponse(res)
+      throw new Error(errorMsg)
+    }
+    
     console.log("[EHL] Inspection deleted from Baserow:", id)
     return { success: true, message: "Deleted" }
   } catch (err) {
