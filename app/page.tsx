@@ -594,9 +594,15 @@ export default function ReportGenerator() {
       )
 
       if (editingSection) {
-        const currentSections = getValues("sections") || []
-        const updatedSections = currentSections.map((s) => (s.id === editingSection.id ? newSection : s))
-        setValue("sections", updatedSections, { shouldDirty: true })
+        const sectionIndex = fields.findIndex((s) => s.id === editingSection.id)
+        if (sectionIndex !== -1) {
+          update(sectionIndex, newSection)
+          console.log("[v0] Updated section at index:", sectionIndex, "with photos:", newSection.photos.length)
+        } else {
+          // Fallback: section not found in fields, append as new
+          console.log("[v0] Section not found, appending as new")
+          append(newSection)
+        }
         setEditingSection(null)
         showToast("Section updated!", "success")
       } else {
