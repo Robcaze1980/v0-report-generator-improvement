@@ -729,17 +729,9 @@ export default function ReportGenerator() {
         ),
       )
 
-      const canvas = await html2canvas(clone, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        logging: false,
-        backgroundColor: "#ffffff",
-      })
+      // Find all sections marked with data-pdf-section
+      const sections = clone.querySelectorAll("[data-pdf-section]")
 
-      document.body.removeChild(clone)
-
-      const imgData = canvas.toDataURL("image/jpeg", 0.95)
       const pdf = new jsPDF({
         orientation: "portrait",
         unit: "mm",
@@ -750,25 +742,62 @@ export default function ReportGenerator() {
       const pageHeight = pdf.internal.pageSize.getHeight()
       const margin = 10
       const contentWidth = pageWidth - margin * 2
-      const imgWidth = contentWidth
-      const imgHeight = (canvas.height * imgWidth) / canvas.width
+      const maxContentHeight = pageHeight - margin * 2
 
-      let heightLeft = imgHeight
-      let position = margin
-      let page = 1
+      let currentY = margin
+      let isFirstPage = true
 
-      // Add first page
-      pdf.addImage(imgData, "JPEG", margin, position, imgWidth, imgHeight)
-      heightLeft -= pageHeight - margin * 2
+      // Process each section individually
+      for (const section of Array.from(sections)) {
+        const sectionElement = section as HTMLElement
 
-      // Add subsequent pages if needed
-      while (heightLeft > 0) {
-        position = -(pageHeight - margin * 2) * page + margin
-        pdf.addPage()
-        pdf.addImage(imgData, "JPEG", margin, position, imgWidth, imgHeight)
-        heightLeft -= pageHeight - margin * 2
-        page++
+        // Capture this section as a separate canvas
+        const sectionCanvas = await html2canvas(sectionElement, {
+          scale: 2,
+          useCORS: true,
+          allowTaint: true,
+          logging: false,
+          backgroundColor: "#ffffff",
+        })
+
+        const imgData = sectionCanvas.toDataURL("image/jpeg", 0.95)
+        const imgWidth = contentWidth
+        const imgHeight = (sectionCanvas.height * imgWidth) / sectionCanvas.width
+
+        // Check if this section fits on the current page
+        if (currentY + imgHeight > pageHeight - margin && !isFirstPage) {
+          // Section doesn't fit - start a new page
+          pdf.addPage()
+          currentY = margin
+        }
+
+        // If section is taller than one page, we need to handle it specially
+        if (imgHeight > maxContentHeight) {
+          // For very tall sections, we'll add them and let them overflow
+          // This is a rare edge case for extremely long content
+          if (!isFirstPage || currentY > margin) {
+            pdf.addPage()
+            currentY = margin
+          }
+          pdf.addImage(imgData, "JPEG", margin, currentY, imgWidth, imgHeight)
+
+          // Calculate how many pages this section spans
+          const pagesNeeded = Math.ceil(imgHeight / maxContentHeight)
+          for (let p = 1; p < pagesNeeded; p++) {
+            pdf.addPage()
+          }
+          currentY = margin + (imgHeight % maxContentHeight)
+          if (currentY < margin + 5) currentY = margin
+        } else {
+          // Normal case - section fits on a page
+          pdf.addImage(imgData, "JPEG", margin, currentY, imgWidth, imgHeight)
+          currentY += imgHeight + 5 // 5mm gap between sections
+        }
+
+        isFirstPage = false
       }
+
+      document.body.removeChild(clone)
 
       const pdfBlob = pdf.output("blob")
       return pdfBlob

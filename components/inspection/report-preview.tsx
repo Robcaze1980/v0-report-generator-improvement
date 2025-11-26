@@ -49,6 +49,7 @@ export const ReportPreview = forwardRef(function ReportPreview(
         <div id={id} ref={ref} style={{ backgroundColor: "#ffffff", color: "#111827", padding: "24px" }}>
           {/* Header */}
           <div
+            data-pdf-section="header"
             style={{
               display: "flex",
               alignItems: "center",
@@ -71,7 +72,10 @@ export const ReportPreview = forwardRef(function ReportPreview(
 
           {/* Customer Info */}
           {(customerName || customerEmail) && (
-            <div style={{ marginTop: "16px", paddingTop: "16px", borderTop: "1px solid #e5e7eb" }}>
+            <div
+              data-pdf-section="customer"
+              style={{ marginTop: "16px", paddingTop: "16px", borderTop: "1px solid #e5e7eb" }}
+            >
               <h3 style={{ fontSize: "16px", fontWeight: "600", marginBottom: "8px" }}>Customer Information</h3>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", fontSize: "14px" }}>
                 {customerName && (
@@ -89,7 +93,10 @@ export const ReportPreview = forwardRef(function ReportPreview(
           )}
 
           {/* Inspection Info */}
-          <div style={{ marginTop: "16px", paddingTop: "16px", borderTop: "1px solid #e5e7eb" }}>
+          <div
+            data-pdf-section="inspection-info"
+            style={{ marginTop: "16px", paddingTop: "16px", borderTop: "1px solid #e5e7eb" }}
+          >
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", fontSize: "14px" }}>
               <div>
                 <span style={{ fontWeight: "600" }}>Address:</span> {address || "—"}
@@ -108,7 +115,10 @@ export const ReportPreview = forwardRef(function ReportPreview(
 
           {/* Final Notes */}
           {finalNotes && (
-            <div style={{ marginTop: "24px", paddingTop: "24px", borderTop: "2px solid #e5e7eb" }}>
+            <div
+              data-pdf-section="final-notes"
+              style={{ marginTop: "24px", paddingTop: "24px", borderTop: "2px solid #e5e7eb" }}
+            >
               <h2 style={{ fontSize: "18px", fontWeight: "700", marginBottom: "12px" }}>
                 Inspector's Final Notes & Recommendations
               </h2>
@@ -119,16 +129,18 @@ export const ReportPreview = forwardRef(function ReportPreview(
           {/* Sections */}
           {sections.length > 0 && (
             <div style={{ marginTop: "24px" }}>
-              <h2 style={{ fontSize: "18px", fontWeight: "700", marginBottom: "16px" }}>Inspection Findings</h2>
+              <div data-pdf-section="findings-header">
+                <h2 style={{ fontSize: "18px", fontWeight: "700", marginBottom: "16px" }}>Inspection Findings</h2>
+              </div>
               <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
                 {sortedSections.map((s, i) => (
                   <div
                     key={s.id}
+                    data-pdf-section={`finding-${i}`}
                     style={{
                       border: "1px solid #e5e7eb",
                       borderRadius: "12px",
                       padding: "16px",
-                      pageBreakInside: "avoid", // Prevent section from breaking across pages
                     }}
                   >
                     <div
@@ -163,9 +175,8 @@ export const ReportPreview = forwardRef(function ReportPreview(
                         style={{
                           marginTop: "16px",
                           display: "flex",
-                          flexWrap: "wrap",
+                          flexDirection: "column",
                           gap: "12px",
-                          pageBreakInside: "avoid",
                         }}
                       >
                         {s.photos.map((p, j) => (
@@ -175,12 +186,12 @@ export const ReportPreview = forwardRef(function ReportPreview(
                             alt=""
                             crossOrigin="anonymous"
                             style={{
-                              width: "calc(50% - 6px)",
-                              height: "200px",
-                              objectFit: "cover",
+                              width: "100%",
+                              maxHeight: "400px",
+                              objectFit: "contain",
                               borderRadius: "8px",
                               border: "1px solid #e5e7eb",
-                              pageBreakInside: "avoid",
+                              backgroundColor: "#f9fafb",
                             }}
                           />
                         ))}
@@ -194,6 +205,7 @@ export const ReportPreview = forwardRef(function ReportPreview(
 
           {/* Footer */}
           <div
+            data-pdf-section="footer"
             style={{
               marginTop: "32px",
               paddingTop: "16px",
