@@ -17,6 +17,7 @@ interface ReportPreviewProps {
   estimator: string
   sections: Section[]
   finalNotes: string
+  id?: string // Added id prop for PDF generation targeting
 }
 
 export const ReportPreview = forwardRef(function ReportPreview(
@@ -32,16 +33,20 @@ export const ReportPreview = forwardRef(function ReportPreview(
     estimator,
     sections,
     finalNotes,
+    id, // Added id prop
   }: ReportPreviewProps,
-  ref: ForwardedRef<HTMLDivElement>
+  ref: ForwardedRef<HTMLDivElement>,
 ) {
   const sortedSections = [...sections].sort((a, b) => getSeverityOrder(a.severity) - getSeverityOrder(b.severity))
+
+  const logoUrl =
+    logo && logo !== "/ehl-logo.png" && logo !== "/images/ehl-20-284-29.png" ? logo : "/images/ehl-20-284-29.png"
 
   return (
     <div className="lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)]">
       <Card className="p-4 sm:p-6 overflow-auto lg:h-full">
         <h2 className="text-xl font-semibold mb-4">Preview</h2>
-        <div ref={ref} style={{ backgroundColor: "#ffffff", color: "#111827", padding: "24px" }}>
+        <div id={id} ref={ref} style={{ backgroundColor: "#ffffff", color: "#111827", padding: "24px" }}>
           {/* Header */}
           <div
             style={{
@@ -53,8 +58,9 @@ export const ReportPreview = forwardRef(function ReportPreview(
             }}
           >
             <img
-              src={logo || "/placeholder.svg"}
+              src={logoUrl || "/placeholder.svg"}
               alt="EHL Logo"
+              crossOrigin="anonymous"
               style={{ height: "80px", width: "auto", objectFit: "contain" }} // Increased height for better visibility
             />
             <div>
@@ -116,7 +122,15 @@ export const ReportPreview = forwardRef(function ReportPreview(
               <h2 style={{ fontSize: "18px", fontWeight: "700", marginBottom: "16px" }}>Inspection Findings</h2>
               <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
                 {sortedSections.map((s, i) => (
-                  <div key={s.id} style={{ border: "1px solid #e5e7eb", borderRadius: "12px", padding: "16px" }}>
+                  <div
+                    key={s.id}
+                    style={{
+                      border: "1px solid #e5e7eb",
+                      borderRadius: "12px",
+                      padding: "16px",
+                      pageBreakInside: "avoid", // Prevent section from breaking across pages
+                    }}
+                  >
                     <div
                       style={{
                         display: "flex",
@@ -159,6 +173,7 @@ export const ReportPreview = forwardRef(function ReportPreview(
                             key={j}
                             src={p || "/placeholder.svg"}
                             alt=""
+                            crossOrigin="anonymous"
                             style={{
                               width: "calc(50% - 6px)",
                               height: "200px",

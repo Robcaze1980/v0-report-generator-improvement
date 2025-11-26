@@ -31,8 +31,8 @@ import { ReportPreview } from "@/components/inspection/report-preview"
 import { useForm, FormProvider, useFieldArray } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { inspectionSchema, type InspectionFormValues } from "@/lib/schemas"
-import { InspectionPDF } from "@/components/inspection/pdf-document"
-import { pdf } from "@react-pdf/renderer"
+import html2canvas from "html2canvas"
+import jsPDF from "jspdf"
 
 export default function ReportGenerator() {
   // Build timestamp: 2025-01-12
@@ -689,12 +689,6 @@ export default function ReportGenerator() {
   const generatePDFBuffer = async (): Promise<Blob | null> => {
     const values = methods.getValues()
 
-    console.log("[v0] generatePDFBuffer called with:", {
-      address: values.address,
-      sectionsCount: values.sections?.length || 0,
-      hasSections: !!values.sections && values.sections.length > 0,
-    })
-
     if (!values.address?.trim()) {
       throw new Error("VALIDATION: Please enter an address before exporting the PDF")
     }
@@ -704,43 +698,87 @@ export default function ReportGenerator() {
     }
 
     try {
-      const logoUrl = "/images/ehl-20-284-29.png"
-
-      const safeSections = values.sections.map((section) => ({
-        issue: String(section.issue || ""),
-        title: String(section.title || section.issue || ""),
-        description: String(section.description || ""),
-        severity: String(section.severity || "Medium"),
-        photos: Array.isArray(section.photos) ? section.photos.map(String) : [],
-      }))
-
-      const pdfData = {
-        company: String(values.company || "EHL Roofing LLC"),
-        license: String(values.license || ""),
-        logo: logoUrl,
-        customerName: String(values.customerName || ""),
-        customerEmail: String(values.customerEmail || ""),
-        address: String(values.address || ""),
-        date: String(values.date || new Date().toISOString().split("T")[0]),
-        inspector: String(values.inspector || ""),
-        estimator: String(values.estimator || ""),
-        sections: safeSections,
-        finalNotes: String(values.finalNotes || ""),
-        inspectorFieldNotes: String(values.inspectorFieldNotes || ""),
+      const previewElement = document.getElementById("report-preview")
+      if (!previewElement) {
+        throw new Error("Preview element not found")
       }
 
-      console.log("[v0] Creating PDF with data:", JSON.stringify(pdfData, null, 2))
+      // Create a clone for PDF generation to avoid affecting the visible preview
+      const clone = previewElement.cloneNode(true) as HTMLElement
+      clone.style.width = "800px"
+      clone.style.padding = "40px"
+      clone.style.backgroundColor = "#ffffff"
+      clone.style.position = "absolute"
+      clone.style.left = "-9999px"
+      clone.style.top = "0"
+      document.body.appendChild(clone)
 
-      const blob = await pdf(<InspectionPDF {...pdfData} />).toBlob()
-      console.log("[v0] PDF blob created successfully, size:", blob.size)
-      return blob
+      // Wait for images to load
+      const images = clone.querySelectorAll("img")
+      await Promise.all(
+        Array.from(images).map(
+          (img) =>
+            new Promise((resolve) => {
+              if (img.complete) {
+                resolve(true)
+              } else {
+                img.onload = () => resolve(true)
+                img.onerror = () => resolve(true)
+              }
+            }),
+        ),
+      )
+
+      const canvas = await html2canvas(clone, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        logging: false,
+        backgroundColor: "#ffffff",
+      })
+
+      document.body.removeChild(clone)
+
+      const imgData = canvas.toDataURL("image/jpeg", 0.95)
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "letter",
+      })
+
+      const pageWidth = pdf.internal.pageSize.getWidth()
+      const pageHeight = pdf.internal.pageSize.getHeight()
+      const margin = 10
+      const contentWidth = pageWidth - margin * 2
+      const imgWidth = contentWidth
+      const imgHeight = (canvas.height * imgWidth) / canvas.width
+
+      let heightLeft = imgHeight
+      let position = margin
+      let page = 1
+
+      // Add first page
+      pdf.addImage(imgData, "JPEG", margin, position, imgWidth, imgHeight)
+      heightLeft -= pageHeight - margin * 2
+
+      // Add subsequent pages if needed
+      while (heightLeft > 0) {
+        position = -(pageHeight - margin * 2) * page + margin
+        pdf.addPage()
+        pdf.addImage(imgData, "JPEG", margin, position, imgWidth, imgHeight)
+        heightLeft -= pageHeight - margin * 2
+        page++
+      }
+
+      const pdfBlob = pdf.output("blob")
+      return pdfBlob
     } catch (error) {
       console.error("[v0] PDF Generation Error:", error)
       await logError("generatePDFBuffer", error instanceof Error ? error : new Error(String(error)), {
         address: values.address,
         sectionsCount: values.sections?.length || 0,
       })
-      throw error // Re-throw to be handled by caller
+      throw error
     }
   }
 
@@ -1051,6 +1089,7 @@ export default function ReportGenerator() {
               estimator={watchedValues.estimator || ""}
               sections={fields}
               finalNotes={watchedValues.finalNotes || ""}
+              id="report-preview"
             />
           </div>
         </div>
