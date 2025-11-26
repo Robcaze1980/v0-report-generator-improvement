@@ -1,6 +1,5 @@
 import type { ForwardedRef } from "react"
 import { forwardRef } from "react"
-import { Card } from "@/components/ui/card"
 import type { Section } from "@/lib/types"
 import { getSeverityOrder, getSeverityBgColor } from "@/lib/utils/severity"
 import { formatDescription } from "@/lib/utils/validation"
@@ -43,9 +42,19 @@ export const ReportPreview = forwardRef(function ReportPreview(
     logo && logo !== "/ehl-logo.png" && logo !== "/images/ehl-20-284-29.png" ? logo : "/images/ehl-20-284-29.png"
 
   return (
-    <div className="lg:sticky lg:top-6 lg:h-[calc(100vh-3rem)]">
-      <Card className="p-4 sm:p-6 overflow-auto lg:h-full">
-        <h2 className="text-xl font-semibold mb-4">Preview</h2>
+    <div style={{ position: "sticky", top: "24px", height: "calc(100vh - 48px)" }} className="hidden lg:block">
+      <div
+        style={{
+          backgroundColor: "#ffffff",
+          border: "1px solid #e5e7eb",
+          borderRadius: "8px",
+          padding: "24px",
+          boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
+          height: "100%",
+          overflow: "auto",
+        }}
+      >
+        <h2 style={{ fontSize: "20px", fontWeight: "600", marginBottom: "16px" }}>Preview</h2>
         <div id={id} ref={ref} style={{ backgroundColor: "#ffffff", color: "#111827", padding: "24px" }}>
           {/* Header */}
           <div
@@ -70,22 +79,14 @@ export const ReportPreview = forwardRef(function ReportPreview(
             </div>
           </div>
 
-          {/* Customer Info - Fixed layout to prevent text clipping */}
+          {/* Customer Info */}
           {(customerName || customerEmail) && (
             <div
               data-pdf-section="customer"
               style={{ marginTop: "16px", paddingTop: "16px", borderTop: "1px solid #e5e7eb" }}
             >
               <h3 style={{ fontSize: "16px", fontWeight: "600", marginBottom: "8px" }}>Customer Information</h3>
-              <div
-                style={{
-                  display: "flex",
-                  flexWrap: "wrap",
-                  gap: "16px",
-                  fontSize: "14px",
-                  lineHeight: "1.6",
-                }}
-              >
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "16px", fontSize: "14px", lineHeight: "1.6" }}>
                 {customerName && (
                   <div style={{ minWidth: "200px", flex: "1 1 45%" }}>
                     <span style={{ fontWeight: "600" }}>Name:</span> {customerName}
@@ -100,20 +101,12 @@ export const ReportPreview = forwardRef(function ReportPreview(
             </div>
           )}
 
-          {/* Inspection Info - Fixed layout to prevent text clipping */}
+          {/* Inspection Info */}
           <div
             data-pdf-section="inspection-info"
             style={{ marginTop: "16px", paddingTop: "16px", borderTop: "1px solid #e5e7eb" }}
           >
-            <div
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                gap: "12px 24px",
-                fontSize: "14px",
-                lineHeight: "1.8",
-              }}
-            >
+            <div style={{ display: "flex", flexWrap: "wrap", gap: "12px 24px", fontSize: "14px", lineHeight: "1.8" }}>
               <div style={{ minWidth: "200px", flex: "1 1 45%" }}>
                 <span style={{ fontWeight: "600" }}>Address:</span> {address || "—"}
               </div>
@@ -153,11 +146,7 @@ export const ReportPreview = forwardRef(function ReportPreview(
                   <div
                     key={s.id}
                     data-pdf-section={`finding-${i}`}
-                    style={{
-                      border: "1px solid #e5e7eb",
-                      borderRadius: "12px",
-                      padding: "16px",
-                    }}
+                    style={{ border: "1px solid #e5e7eb", borderRadius: "12px", padding: "16px" }}
                   >
                     <div
                       style={{
@@ -190,14 +179,7 @@ export const ReportPreview = forwardRef(function ReportPreview(
                       {formatDescription(s.description)}
                     </p>
                     {s.photos.length > 0 && (
-                      <div
-                        style={{
-                          marginTop: "16px",
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: "12px",
-                        }}
-                      >
+                      <div style={{ marginTop: "16px", display: "flex", flexDirection: "column", gap: "12px" }}>
                         {s.photos.map((p, j) => (
                           <img
                             key={j}
@@ -237,7 +219,7 @@ export const ReportPreview = forwardRef(function ReportPreview(
             Prepared by {estimator}. © {new Date().getFullYear()} {company}. All rights reserved.
           </div>
         </div>
-      </Card>
+      </div>
     </div>
   )
 })

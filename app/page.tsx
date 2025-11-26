@@ -1064,11 +1064,30 @@ export default function ReportGenerator() {
 
         <div className="max-w-7xl mx-auto">
           <header className="mb-6 pb-4 border-b border-border">
-            <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-primary flex items-center justify-center">
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+                flexWrap: "wrap",
+                gap: "16px",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <div
+                  style={{
+                    width: "48px",
+                    height: "48px",
+                    borderRadius: "8px",
+                    backgroundColor: "#f97316",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
                   <svg
-                    className="h-6 w-6 sm:h-7 sm:w-7 text-white"
+                    style={{ height: "28px", width: "28px", color: "white" }}
                     fill="none"
                     viewBox="0 0 24 24"
                     stroke="currentColor"
@@ -1082,67 +1101,77 @@ export default function ReportGenerator() {
                   </svg>
                 </div>
                 <div>
-                  <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground">Roof Inspection Report</h1>
-                  <p className="text-sm text-muted-foreground hidden sm:block">
+                  <h1 style={{ fontSize: "24px", fontWeight: "700", color: "#111827", margin: 0 }}>
+                    Roof Inspection Report
+                  </h1>
+                  <p style={{ fontSize: "14px", color: "#6b7280", margin: 0 }}>
                     EHL Roofing LLC - Professional Inspection Generator
                   </p>
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-2 items-center w-full sm:w-auto">
-                <div className="flex items-center gap-2 text-sm mr-2">
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", alignItems: "center" }}>
+                <div
+                  style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", marginRight: "8px" }}
+                >
                   {autoSaveStatus === "saving" && (
-                    <span className="text-blue-600 flex items-center gap-1.5">
-                      <div className="h-3 w-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                    <span style={{ color: "#2563eb", display: "flex", alignItems: "center", gap: "6px" }}>
+                      <div
+                        style={{
+                          height: "12px",
+                          width: "12px",
+                          border: "2px solid #2563eb",
+                          borderTopColor: "transparent",
+                          borderRadius: "50%",
+                          animation: "spin 1s linear infinite",
+                        }}
+                      />
                       Saving...
                     </span>
                   )}
                   {autoSaveStatus === "saved" && (
-                    <span className="text-green-600 flex items-center gap-1.5">
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <span style={{ color: "#16a34a", display: "flex", alignItems: "center", gap: "6px" }}>
+                      <svg
+                        style={{ height: "16px", width: "16px" }}
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                       </svg>
                       Saved
                     </span>
                   )}
                   {autoSaveStatus === "unsaved" && (
-                    <span className="text-muted-foreground flex items-center gap-1.5">
-                      <div className="h-2 w-2 bg-muted-foreground rounded-full" />
+                    <span style={{ color: "#6b7280", display: "flex", alignItems: "center", gap: "6px" }}>
+                      <div style={{ height: "8px", width: "8px", backgroundColor: "#6b7280", borderRadius: "50%" }} />
                       Unsaved
                     </span>
                   )}
                 </div>
-                <Button
-                  onClick={loadInspections}
-                  variant="outline"
-                  disabled={isLoadingInspections}
-                  className="touch-target flex-1 sm:flex-none bg-transparent"
-                  size="sm"
-                >
+                <Button onClick={loadInspections} variant="outline" disabled={isLoadingInspections} size="sm">
                   {isLoadingInspections ? "Loading..." : "Load"}
                 </Button>
-                <Button
-                  onClick={saveInspection}
-                  variant="outline"
-                  className="touch-target flex-1 sm:flex-none bg-transparent"
-                  size="sm"
-                >
+                <Button onClick={saveInspection} variant="outline" size="sm">
                   Save
                 </Button>
-                <Button
-                  onClick={newInspection}
-                  variant="outline"
-                  className="touch-target flex-1 sm:flex-none bg-transparent"
-                  size="sm"
-                >
+                <Button onClick={newInspection} variant="outline" size="sm">
                   New
                 </Button>
               </div>
             </div>
           </header>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-            <div className="space-y-4 sm:space-y-6">
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr",
+              gap: "24px",
+            }}
+            className="lg:grid-cols-2"
+          >
+            {/* Left Column - Forms */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
               <CompanyForm />
               <CustomerForm />
               <InspectionDetailsForm />
@@ -1184,14 +1213,14 @@ export default function ReportGenerator() {
                 onGenerate={generateFinalNotes}
               />
 
-              <div className="flex flex-col sm:flex-row gap-3">
-                <Button
-                  onClick={exportPDF}
-                  className="flex-1 touch-target gap-2"
-                  size="lg"
-                  disabled={fields.length === 0}
-                >
-                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div style={{ display: "flex", flexDirection: "row", gap: "12px" }}>
+                <Button onClick={exportPDF} style={{ flex: 1 }} size="lg" disabled={fields.length === 0}>
+                  <svg
+                    style={{ height: "20px", width: "20px", marginRight: "8px" }}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -1204,11 +1233,16 @@ export default function ReportGenerator() {
                 <Button
                   onClick={() => setIsEmailDialogOpen(true)}
                   variant="outline"
-                  className="flex-1 touch-target gap-2"
+                  style={{ flex: 1 }}
                   size="lg"
                   disabled={fields.length === 0}
                 >
-                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg
+                    style={{ height: "20px", width: "20px", marginRight: "8px" }}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
                     <path
                       strokeLinecap="round"
                       strokeLinejoin="round"
@@ -1221,6 +1255,7 @@ export default function ReportGenerator() {
               </div>
             </div>
 
+            {/* Right Column - Preview */}
             <ReportPreview
               ref={previewRef}
               company={watchedValues.company || ""}
