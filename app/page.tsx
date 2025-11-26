@@ -523,7 +523,7 @@ export default function ReportGenerator() {
     try {
       let finalIssue = currentSection.issue.trim()
       let finalTitle = currentSection.title?.trim() || ""
-      let finalDescription = currentSection.description.trim()
+      let finalDescription = currentSection.description?.trim() || ""
       const finalSeverity = currentSection.severity
       const finalPhotos = [...currentSection.photos]
 
@@ -539,14 +539,15 @@ export default function ReportGenerator() {
       if (hasAccentedChars || hasSpanishWords) {
         const translateResult = await translateSpanishToEnglish(finalIssue, finalDescription, finalTitle)
         if (translateResult) {
-          finalIssue = translateResult.issue
-          finalDescription = translateResult.description
+          finalIssue = translateResult.issue || finalIssue
+          finalDescription = translateResult.description || finalDescription
           finalTitle = translateResult.title || finalTitle
         }
       }
 
-      const cleanAccents = (text: string) =>
-        text
+      const cleanAccents = (text: string | undefined | null): string => {
+        if (!text) return ""
+        return text
           .replace(/[áàäâ]/g, "a")
           .replace(/[éèëê]/g, "e")
           .replace(/[íìïî]/g, "i")
@@ -560,18 +561,19 @@ export default function ReportGenerator() {
           .replace(/[ÚÙÜÛ]/g, "U")
           .replace(/[Ñ]/g, "N")
           .replace(/[¿¡]/g, "")
+      }
 
       finalIssue = cleanAccents(finalIssue)
       finalDescription = cleanAccents(finalDescription)
       finalTitle = cleanAccents(finalTitle)
 
-      const cleanTitle = finalTitle
+      const cleanTitle = (finalTitle || "")
         .replace(/["""]/g, "")
         .replace(/\s+/g, " ")
         .trim()
         .replace(/^(.)/, (c) => c.toUpperCase())
 
-      const cleanDescription = finalDescription.replace(/["""]/g, "").replace(/\s+/g, " ").trim()
+      const cleanDescription = (finalDescription || "").replace(/["""]/g, "").replace(/\s+/g, " ").trim()
 
       const newSection: Section = {
         id: editingSection?.id || crypto.randomUUID(),
