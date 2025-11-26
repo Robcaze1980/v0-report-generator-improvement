@@ -1028,45 +1028,121 @@ export default function ReportGenerator() {
 
   return (
     <FormProvider {...methods}>
-      <div className="min-h-screen bg-gray-50 p-3 sm:p-6">
-        <div className="fixed bottom-4 right-4 z-50 space-y-2">
+      <div className="min-h-screen bg-gradient-to-b from-orange-50/50 to-gray-50 p-3 sm:p-6">
+        <div className="fixed bottom-4 right-4 z-50 space-y-2 max-w-sm">
           {toasts.map((toast) => (
             <div
               key={toast.id}
-              className={`p-4 rounded-lg shadow-lg text-white animate-slide-up ${
-                toast.type === "success" ? "bg-green-600" : toast.type === "error" ? "bg-red-600" : "bg-blue-600"
+              className={`p-4 rounded-lg shadow-lg text-white animate-slide-up flex items-center gap-3 ${
+                toast.type === "success" ? "bg-green-600" : toast.type === "error" ? "bg-red-600" : "bg-primary"
               }`}
             >
-              <div className="flex items-center gap-2">
-                <span>{toast.message}</span>
-              </div>
+              {toast.type === "success" && (
+                <svg className="h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              )}
+              {toast.type === "error" && (
+                <svg className="h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              )}
+              {toast.type === "info" && (
+                <svg className="h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+              )}
+              <span className="text-sm font-medium">{toast.message}</span>
             </div>
           ))}
         </div>
 
         <div className="max-w-7xl mx-auto">
-          <div className="mb-4 flex flex-wrap gap-2 justify-between items-center">
-            <h1 className="text-2xl sm:text-3xl font-bold">Roof Inspection Report Generator</h1>
-            <div className="flex gap-2 items-center">
-              <div className="flex items-center gap-2 text-sm">
-                {autoSaveStatus === "saving" && <span className="text-blue-600">Saving...</span>}
-                {autoSaveStatus === "saved" && <span className="text-green-600">✓ Saved</span>}
-                {autoSaveStatus === "unsaved" && <span className="text-gray-400">Unsaved</span>}
+          <header className="mb-6 pb-4 border-b border-border">
+            <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-primary flex items-center justify-center">
+                  <svg
+                    className="h-6 w-6 sm:h-7 sm:w-7 text-white"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+                    />
+                  </svg>
+                </div>
+                <div>
+                  <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground">Roof Inspection Report</h1>
+                  <p className="text-sm text-muted-foreground hidden sm:block">
+                    EHL Roofing LLC - Professional Inspection Generator
+                  </p>
+                </div>
               </div>
-              <Button onClick={loadInspections} variant="outline" disabled={isLoadingInspections}>
-                {isLoadingInspections ? "Loading..." : "Saved Reports"}
-              </Button>
-              <Button onClick={saveInspection} variant="outline">
-                Save
-              </Button>
-              <Button onClick={newInspection} variant="outline">
-                New
-              </Button>
-            </div>
-          </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="space-y-6">
+              <div className="flex flex-wrap gap-2 items-center w-full sm:w-auto">
+                <div className="flex items-center gap-2 text-sm mr-2">
+                  {autoSaveStatus === "saving" && (
+                    <span className="text-blue-600 flex items-center gap-1.5">
+                      <div className="h-3 w-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                      Saving...
+                    </span>
+                  )}
+                  {autoSaveStatus === "saved" && (
+                    <span className="text-green-600 flex items-center gap-1.5">
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      Saved
+                    </span>
+                  )}
+                  {autoSaveStatus === "unsaved" && (
+                    <span className="text-muted-foreground flex items-center gap-1.5">
+                      <div className="h-2 w-2 bg-muted-foreground rounded-full" />
+                      Unsaved
+                    </span>
+                  )}
+                </div>
+                <Button
+                  onClick={loadInspections}
+                  variant="outline"
+                  disabled={isLoadingInspections}
+                  className="touch-target flex-1 sm:flex-none bg-transparent"
+                  size="sm"
+                >
+                  {isLoadingInspections ? "Loading..." : "Load"}
+                </Button>
+                <Button
+                  onClick={saveInspection}
+                  variant="outline"
+                  className="touch-target flex-1 sm:flex-none bg-transparent"
+                  size="sm"
+                >
+                  Save
+                </Button>
+                <Button
+                  onClick={newInspection}
+                  variant="outline"
+                  className="touch-target flex-1 sm:flex-none bg-transparent"
+                  size="sm"
+                >
+                  New
+                </Button>
+              </div>
+            </div>
+          </header>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+            <div className="space-y-4 sm:space-y-6">
               <CompanyForm />
               <CustomerForm />
               <InspectionDetailsForm />
@@ -1109,15 +1185,37 @@ export default function ReportGenerator() {
               />
 
               <div className="flex flex-col sm:flex-row gap-3">
-                <Button onClick={exportPDF} className="flex-1" disabled={fields.length === 0}>
+                <Button
+                  onClick={exportPDF}
+                  className="flex-1 touch-target gap-2"
+                  size="lg"
+                  disabled={fields.length === 0}
+                >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                    />
+                  </svg>
                   Export PDF
                 </Button>
                 <Button
                   onClick={() => setIsEmailDialogOpen(true)}
                   variant="outline"
-                  className="flex-1 bg-transparent"
+                  className="flex-1 touch-target gap-2"
+                  size="lg"
                   disabled={fields.length === 0}
                 >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                    />
+                  </svg>
                   Email Report
                 </Button>
               </div>
@@ -1141,87 +1239,242 @@ export default function ReportGenerator() {
           </div>
         </div>
 
-        {/* Email Dialog */}
+        {/* Email Dialog - Improved for mobile */}
         <Dialog open={isEmailDialogOpen} onOpenChange={setIsEmailDialogOpen}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto mx-4 sm:mx-auto">
             <DialogHeader>
-              <DialogTitle>Email Inspection Report</DialogTitle>
+              <DialogTitle className="flex items-center gap-2">
+                <svg className="h-5 w-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                  />
+                </svg>
+                Email Inspection Report
+              </DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <Label>To *</Label>
-                <Input value={emailTo} onChange={(e) => setEmailTo(e.target.value)} required />
+                <Label className="text-sm font-medium">To *</Label>
+                <Input
+                  value={emailTo}
+                  onChange={(e) => setEmailTo(e.target.value)}
+                  required
+                  className="touch-target mt-1"
+                  placeholder="recipient@email.com"
+                />
               </div>
               <div>
-                <Label>CC (optional)</Label>
-                <Input value={emailCc} onChange={(e) => setEmailCc(e.target.value)} />
+                <Label className="text-sm font-medium">CC (optional)</Label>
+                <Input
+                  value={emailCc}
+                  onChange={(e) => setEmailCc(e.target.value)}
+                  className="touch-target mt-1"
+                  placeholder="cc@email.com"
+                />
               </div>
               <div>
-                <Label>Subject *</Label>
-                <Input value={emailSubject} onChange={(e) => setEmailSubject(e.target.value)} required />
+                <Label className="text-sm font-medium">Subject *</Label>
+                <Input
+                  value={emailSubject}
+                  onChange={(e) => setEmailSubject(e.target.value)}
+                  required
+                  className="touch-target mt-1"
+                />
               </div>
               <div>
-                <Label>Message *</Label>
-                <Textarea value={emailBody} onChange={(e) => setEmailBody(e.target.value)} rows={8} required />
+                <Label className="text-sm font-medium">Message *</Label>
+                <Textarea
+                  value={emailBody}
+                  onChange={(e) => setEmailBody(e.target.value)}
+                  rows={8}
+                  required
+                  className="touch-target mt-1"
+                />
               </div>
-              <div className="flex items-center gap-2 text-sm text-green-600">
+              <div className="flex items-center gap-2 text-sm text-green-600 bg-green-50 p-3 rounded-lg">
+                <svg className="h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                  />
+                </svg>
                 PDF report will be attached automatically
               </div>
-              <div className="flex gap-2 justify-end">
-                <Button variant="outline" onClick={() => setIsEmailDialogOpen(false)} disabled={isSendingEmail}>
+              <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setIsEmailDialogOpen(false)}
+                  disabled={isSendingEmail}
+                  className="touch-target"
+                >
                   Cancel
                 </Button>
-                <Button onClick={sendEmail} disabled={isSendingEmail}>
-                  {isSendingEmail ? "Sending..." : "Send Email"}
+                <Button onClick={sendEmail} disabled={isSendingEmail} className="touch-target gap-2">
+                  {isSendingEmail ? (
+                    <>
+                      <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+                        />
+                      </svg>
+                      Send Email
+                    </>
+                  )}
                 </Button>
               </div>
             </div>
           </DialogContent>
         </Dialog>
 
-        {/* Load Dialog */}
+        {/* Load Dialog - Improved for mobile */}
         <Dialog open={isLoadDialogOpen} onOpenChange={setIsLoadDialogOpen}>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto mx-4 sm:mx-auto">
             <DialogHeader>
-              <DialogTitle>Load Saved Inspection Reports</DialogTitle>
+              <DialogTitle className="flex items-center gap-2">
+                <svg className="h-5 w-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"
+                  />
+                </svg>
+                Saved Inspection Reports
+              </DialogTitle>
             </DialogHeader>
             <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
               <p className="text-sm text-blue-800">
                 Select a previously saved inspection to continue editing or review.
               </p>
             </div>
-            <div className="space-y-3 bg-white p-4 rounded-lg">
+            <div className="space-y-3">
               {savedInspections.length === 0 ? (
-                <p className="text-center text-gray-500 py-8">No saved inspections found.</p>
+                <div className="text-center py-12">
+                  <div className="w-16 h-16 mx-auto rounded-full bg-muted flex items-center justify-center mb-4">
+                    <svg
+                      className="h-8 w-8 text-muted-foreground"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                      />
+                    </svg>
+                  </div>
+                  <p className="text-muted-foreground">No saved inspections found.</p>
+                  <p className="text-sm text-muted-foreground mt-1">Create and save your first inspection report.</p>
+                </div>
               ) : (
                 savedInspections.map((insp) => (
                   <div
                     key={insp.id}
-                    className="border rounded-lg p-4 flex justify-between items-start hover:bg-gray-50 transition-colors bg-white"
+                    className="border rounded-lg p-4 hover:border-primary/50 hover:bg-accent/50 transition-colors"
                   >
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-lg">{insp.address}</h3>
-                      <div className="text-sm text-gray-600 mt-2 space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">Date:</span> {insp.date}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium">Inspector:</span> {insp.inspector}
-                        </div>
-                        {insp.customerName && (
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-base sm:text-lg truncate">{insp.address}</h3>
+                        <div className="text-sm text-muted-foreground mt-2 space-y-1">
                           <div className="flex items-center gap-2">
-                            <span className="font-medium">Customer:</span> {insp.customerName}
+                            <svg
+                              className="h-4 w-4 flex-shrink-0"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                              />
+                            </svg>
+                            <span>{insp.date}</span>
                           </div>
-                        )}
+                          <div className="flex items-center gap-2">
+                            <svg
+                              className="h-4 w-4 flex-shrink-0"
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                              />
+                            </svg>
+                            <span>{insp.inspector}</span>
+                          </div>
+                          {insp.customerName && (
+                            <div className="flex items-center gap-2">
+                              <svg
+                                className="h-4 w-4 flex-shrink-0"
+                                fill="none"
+                                viewBox="0 0 24 24"
+                                stroke="currentColor"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
+                                />
+                              </svg>
+                              <span className="truncate">{insp.customerName}</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex gap-2 ml-4">
-                      <Button onClick={() => loadInspection(insp.id)} size="sm" className="min-w-[80px]">
-                        Load & Edit
-                      </Button>
-                      <Button onClick={() => deleteInspection(insp.id)} variant="destructive" size="sm">
-                        Delete
-                      </Button>
+                      <div className="flex gap-2 w-full sm:w-auto">
+                        <Button
+                          onClick={() => loadInspection(insp.id)}
+                          size="sm"
+                          className="flex-1 sm:flex-none touch-target gap-1.5"
+                        >
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+                            />
+                          </svg>
+                          Load
+                        </Button>
+                        <Button
+                          onClick={() => deleteInspection(insp.id)}
+                          variant="destructive"
+                          size="sm"
+                          className="touch-target"
+                        >
+                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                            />
+                          </svg>
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 ))

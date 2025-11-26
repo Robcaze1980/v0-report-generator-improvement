@@ -7,7 +7,7 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* Replaced all OKLCH colors with HEX equivalents for PDF compatibility */
+/* Updated color palette with EHL brand colors */
 :root {
   --background: #ffffff;
   --foreground: #111827;
@@ -15,19 +15,19 @@
   --card-foreground: #111827;
   --popover: #ffffff;
   --popover-foreground: #111827;
-  --primary: #1f2937;
-  --primary-foreground: #f9fafb;
+  --primary: #f97316;
+  --primary-foreground: #ffffff;
   --secondary: #f3f4f6;
   --secondary-foreground: #1f2937;
   --muted: #f3f4f6;
   --muted-foreground: #6b7280;
-  --accent: #f3f4f6;
-  --accent-foreground: #1f2937;
+  --accent: #fff7ed;
+  --accent-foreground: #c2410c;
   --destructive: #dc2626;
   --destructive-foreground: #ffffff;
   --border: #e5e7eb;
   --input: #e5e7eb;
-  --ring: #9ca3af;
+  --ring: #f97316;
   --chart-1: #f97316;
   --chart-2: #3b82f6;
   --chart-3: #8b5cf6;
@@ -36,47 +36,47 @@
   --radius: 0.625rem;
   --sidebar: #f9fafb;
   --sidebar-foreground: #111827;
-  --sidebar-primary: #1f2937;
-  --sidebar-primary-foreground: #f9fafb;
-  --sidebar-accent: #f3f4f6;
-  --sidebar-accent-foreground: #1f2937;
+  --sidebar-primary: #f97316;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #fff7ed;
+  --sidebar-accent-foreground: #c2410c;
   --sidebar-border: #e5e7eb;
-  --sidebar-ring: #9ca3af;
+  --sidebar-ring: #f97316;
 }
 
 .dark {
   --background: #111827;
   --foreground: #f9fafb;
-  --card: #111827;
+  --card: #1f2937;
   --card-foreground: #f9fafb;
-  --popover: #111827;
+  --popover: #1f2937;
   --popover-foreground: #f9fafb;
-  --primary: #f9fafb;
-  --primary-foreground: #1f2937;
+  --primary: #fb923c;
+  --primary-foreground: #111827;
   --secondary: #374151;
   --secondary-foreground: #f9fafb;
   --muted: #374151;
   --muted-foreground: #9ca3af;
-  --accent: #374151;
-  --accent-foreground: #f9fafb;
+  --accent: #431407;
+  --accent-foreground: #fed7aa;
   --destructive: #7f1d1d;
   --destructive-foreground: #fca5a5;
   --border: #374151;
   --input: #374151;
-  --ring: #6b7280;
-  --chart-1: #8b5cf6;
+  --ring: #fb923c;
+  --chart-1: #fb923c;
   --chart-2: #10b981;
   --chart-3: #ef4444;
   --chart-4: #a855f7;
   --chart-5: #f59e0b;
   --sidebar: #1f2937;
   --sidebar-foreground: #f9fafb;
-  --sidebar-primary: #8b5cf6;
-  --sidebar-primary-foreground: #f9fafb;
-  --sidebar-accent: #374151;
-  --sidebar-accent-foreground: #f9fafb;
+  --sidebar-primary: #fb923c;
+  --sidebar-primary-foreground: #111827;
+  --sidebar-accent: #431407;
+  --sidebar-accent-foreground: #fed7aa;
   --sidebar-border: #374151;
-  --sidebar-ring: #6b7280;
+  --sidebar-ring: #fb923c;
 }
 
 @layer base {
@@ -90,15 +90,18 @@
   }
 }
 
-@layer components {
-  /* Custom component styles can go here */
-}
-
+/* Added mobile-first responsive utilities */
 @layer utilities {
-  /* Custom utility classes can go here */
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px];
+  }
+
+  .safe-area-inset {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
 }
 
-/* Added toast notification animations */
+/* Toast notification animations */
 @keyframes slide-up {
   from {
     transform: translateY(100%);
@@ -112,4 +115,28 @@
 
 .animate-slide-up {
   animation: slide-up 0.3s ease-out forwards;
+}
+
+/* Added recording pulse animation */
+@keyframes recording-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.1);
+  }
+}
+
+.animate-recording {
+  animation: recording-pulse 1s ease-in-out infinite;
+}
+
+/* Mobile scroll improvements */
+@media (max-width: 768px) {
+  .overflow-auto {
+    -webkit-overflow-scrolling: touch;
+  }
 }

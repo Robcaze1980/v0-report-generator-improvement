@@ -1,15 +1,33 @@
 import type React from "react"
-import type { Metadata } from "next"
+import type { Metadata, Viewport } from "next"
 import { Analytics } from "@vercel/analytics/next"
 import "./globals.css"
 
 export const metadata: Metadata = {
   title: "EHL Roofing - Inspection Report Generator",
-  description: "Professional roof inspection report generator for EHL Roofing LLC",
+  description:
+    "Professional roof inspection report generator for EHL Roofing LLC. Create detailed inspection reports with AI-powered descriptions.",
   generator: "v0.app",
+  keywords: ["roof inspection", "roofing report", "EHL Roofing", "inspection generator"],
+  authors: [{ name: "EHL Roofing LLC" }],
   icons: {
     icon: "/icon.svg",
+    apple: "/icon.svg",
   },
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "EHL Reports",
+  },
+}
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  themeColor: "#f97316",
 }
 
 export default function RootLayout({
@@ -27,7 +45,7 @@ export default function RootLayout({
           rel="stylesheet"
         />
       </head>
-      <body>
+      <body className="safe-area-inset">
         {children}
         <Analytics />
       </body>

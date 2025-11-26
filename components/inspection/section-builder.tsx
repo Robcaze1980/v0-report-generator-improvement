@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { X, StopCircle } from "lucide-react"
+import { X, StopCircle, Mic, Sparkles, Camera, Plus, Save } from "lucide-react"
 import type { Section, Severity } from "@/lib/types"
 
 interface SectionBuilderProps {
@@ -48,102 +48,162 @@ export function SectionBuilder({
   const isEditing = editingSection !== null
 
   return (
-    <Card className="p-4 sm:p-6">
-      <h2 className="text-xl font-semibold mb-4">{isEditing ? "Edit Section" : "Agregar Problema/daño:"}</h2>
+    <Card className="p-4 sm:p-6 border-l-4 border-l-primary">
+      <h2 className="text-lg sm:text-xl font-semibold mb-4 flex items-center gap-2">
+        {isEditing ? (
+          <>
+            <Save className="h-5 w-5 text-primary" />
+            Edit Section
+          </>
+        ) : (
+          <>
+            <Plus className="h-5 w-5 text-primary" />
+            Add Issue/Damage
+          </>
+        )}
+      </h2>
       <div className="space-y-4">
+        {/* Issue Input */}
         <div>
-          <Label>Daño: *</Label>
-          <div className="flex gap-2">
+          <Label className="text-sm font-medium">Issue Description *</Label>
+          <div className="flex flex-col sm:flex-row gap-2 mt-1.5">
             <Input
               value={currentSection.issue}
               onChange={(e) => onSectionChange({ ...currentSection, issue: e.target.value })}
-              className="flex-1"
-              placeholder="Describe el daño observado..."
+              className="flex-1 touch-target"
+              placeholder="Describe the observed damage..."
+              aria-label="Issue description"
             />
             {!isRecordingIssue && !isTranscribingIssue && (
-              <Button onClick={onStartRecording} variant="outline" size="sm">
-                🎤 GRABAR
+              <Button
+                onClick={onStartRecording}
+                variant="outline"
+                size="default"
+                className="touch-target gap-2 whitespace-nowrap bg-transparent"
+                aria-label="Start voice recording"
+              >
+                <Mic className="h-4 w-4" />
+                <span className="hidden sm:inline">Record</span>
               </Button>
             )}
             {isRecordingIssue && (
               <div className="flex items-center gap-2">
-                <div className="flex items-center gap-2 text-red-600 animate-pulse">
-                  <div className="w-3 h-3 bg-red-600 rounded-full"></div>
+                <div className="flex items-center gap-2 text-red-600 animate-recording px-3 py-2 bg-red-50 rounded-md">
+                  <div className="w-3 h-3 bg-red-600 rounded-full" />
                   <span className="font-medium text-sm">Recording...</span>
                 </div>
-                <Button onClick={onStopRecording} variant="destructive" size="sm">
-                  <StopCircle className="h-4 w-4" /> Stop
+                <Button onClick={onStopRecording} variant="destructive" size="default" className="touch-target gap-2">
+                  <StopCircle className="h-4 w-4" />
+                  <span className="hidden sm:inline">Stop</span>
                 </Button>
               </div>
             )}
             {isTranscribingIssue && (
-              <Button disabled size="sm">
-                Transcribing...
+              <Button disabled size="default" className="touch-target gap-2">
+                <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                <span className="hidden sm:inline">Processing...</span>
               </Button>
             )}
           </div>
-          <p className="text-xs text-gray-500 mt-1">
-            Describe el daño. La IA generará un título profesional y descripción técnica.
+          <p className="text-xs text-muted-foreground mt-1.5">
+            Describe the damage. AI will generate a professional title and technical description.
           </p>
         </div>
 
+        {/* AI Generated Title */}
         {currentSection.title && (
           <div>
-            <Label>Título Generado por IA</Label>
+            <Label className="text-sm font-medium">AI Generated Title</Label>
             <Input
               value={currentSection.title}
               onChange={(e) => onSectionChange({ ...currentSection, title: e.target.value })}
-              className="font-semibold"
-              placeholder="El título se generará automáticamente..."
+              className="font-semibold mt-1.5 touch-target"
+              placeholder="Title will be generated automatically..."
             />
-            <p className="text-xs text-gray-500 mt-1">Puedes editar el título generado por la IA si lo deseas.</p>
           </div>
         )}
 
+        {/* Description */}
         <div>
-          <div className="flex justify-between items-center mb-2">
-            <Label>Description</Label>
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 mb-1.5">
+            <Label className="text-sm font-medium">Technical Description</Label>
             <Button
               onClick={onGenerateDescription}
               size="sm"
-              variant="outline"
+              variant="default"
               disabled={isGeneratingDesc || !currentSection.issue.trim()}
+              className="touch-target gap-2 w-full sm:w-auto"
             >
-              {isGeneratingDesc ? "Generating..." : "✨ Generate Title + Description with AI"}
+              {isGeneratingDesc ? (
+                <>
+                  <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4" />
+                  Generate with AI
+                </>
+              )}
             </Button>
           </div>
           <Textarea
             value={currentSection.description}
             onChange={(e) => onSectionChange({ ...currentSection, description: e.target.value })}
             rows={5}
-            placeholder="La descripción técnica se generará automáticamente..."
+            className="touch-target"
+            placeholder="Technical description will be generated automatically..."
           />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {/* Severity and Photos - Stack on mobile */}
+        <div className="grid grid-cols-1 gap-4">
           <div>
-            <Label>Severity</Label>
+            <Label className="text-sm font-medium">Severity Level</Label>
             <Select
               key={`severity-${currentSection.id}-${currentSection.severity}`}
               value={currentSection.severity}
               onValueChange={(v) => {
-                console.log("[v0] Severity changed to:", v)
                 onSectionChange({ ...currentSection, severity: v as Severity })
               }}
             >
-              <SelectTrigger>
+              <SelectTrigger className="touch-target mt-1.5">
                 <SelectValue placeholder="Select severity" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Critical">Critical</SelectItem>
-                <SelectItem value="High">High</SelectItem>
-                <SelectItem value="Medium">Medium</SelectItem>
-                <SelectItem value="Low">Low</SelectItem>
+                <SelectItem value="Critical" className="touch-target">
+                  <span className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-red-600" />
+                    Critical
+                  </span>
+                </SelectItem>
+                <SelectItem value="High" className="touch-target">
+                  <span className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-orange-500" />
+                    High
+                  </span>
+                </SelectItem>
+                <SelectItem value="Medium" className="touch-target">
+                  <span className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-yellow-500" />
+                    Medium
+                  </span>
+                </SelectItem>
+                <SelectItem value="Low" className="touch-target">
+                  <span className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full bg-green-500" />
+                    Low
+                  </span>
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
+
           <div>
-            <Label>Photos (max 4) - Current: {currentSection.photos.length}</Label>
+            <Label className="text-sm font-medium flex items-center gap-2">
+              <Camera className="h-4 w-4" />
+              Photos ({currentSection.photos.length}/4)
+            </Label>
             <Input
               type="file"
               accept="image/*"
@@ -151,15 +211,16 @@ export function SectionBuilder({
               onChange={onPhotoUpload}
               disabled={isUploadingPhotos}
               key={`photo-input-${currentSection.id}-${currentSection.photos.length}`}
+              className="touch-target mt-1.5"
             />
             {isUploadingPhotos && compressionProgress && compressionProgress.total > 0 && (
               <div className="mt-2">
-                <p className="text-sm text-blue-600">
+                <p className="text-sm text-primary font-medium">
                   Compressing image {compressionProgress.current} of {compressionProgress.total}...
                 </p>
-                <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
+                <div className="w-full bg-secondary rounded-full h-2 mt-1">
                   <div
-                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                    className="bg-primary h-2 rounded-full transition-all duration-300"
                     style={{ width: `${(compressionProgress.current / compressionProgress.total) * 100}%` }}
                   />
                 </div>
@@ -168,21 +229,23 @@ export function SectionBuilder({
           </div>
         </div>
 
+        {/* Photo Previews */}
         {currentSection.photos.length > 0 && (
           <div>
-            <Label className="mb-2 block">Current Photos ({currentSection.photos.length}/4)</Label>
-            <div className="flex flex-wrap gap-2">
+            <Label className="mb-2 block text-sm font-medium">Uploaded Photos ({currentSection.photos.length}/4)</Label>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {currentSection.photos.map((p, i) => (
-                <div key={`photo-${i}-${p.substring(0, 20)}`} className="relative">
+                <div key={`photo-${i}-${p.substring(0, 20)}`} className="relative group">
                   <img
                     src={p || "/placeholder.svg"}
                     alt={`Photo ${i + 1}`}
-                    className="w-20 h-20 object-cover rounded border"
+                    className="w-full aspect-square object-cover rounded-lg border"
                   />
                   <button
                     type="button"
                     onClick={() => onRemovePhoto(i)}
-                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                    className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity touch-target"
+                    aria-label={`Remove photo ${i + 1}`}
                   >
                     <X className="h-3 w-3" />
                   </button>
@@ -192,12 +255,23 @@ export function SectionBuilder({
           </div>
         )}
 
-        <div className="flex gap-2">
-          <Button onClick={onAddSection} className="flex-1" disabled={isGeneratingDesc}>
-            {isEditing ? "Update Section" : "Add Section"}
+        {/* Action Buttons */}
+        <div className="flex flex-col sm:flex-row gap-2 pt-2">
+          <Button onClick={onAddSection} className="flex-1 touch-target gap-2" disabled={isGeneratingDesc} size="lg">
+            {isEditing ? (
+              <>
+                <Save className="h-4 w-4" />
+                Update Section
+              </>
+            ) : (
+              <>
+                <Plus className="h-4 w-4" />
+                Add Section
+              </>
+            )}
           </Button>
           {isEditing && (
-            <Button onClick={onCancelEdit} variant="outline">
+            <Button onClick={onCancelEdit} variant="outline" size="lg" className="touch-target bg-transparent">
               Cancel
             </Button>
           )}
