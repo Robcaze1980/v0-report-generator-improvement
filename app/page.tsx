@@ -516,83 +516,85 @@ export default function ReportGenerator() {
   // Section Management
   const addSection = async () => {
     if (!currentSection.issue.trim()) {
-      showToast("Please enter an issue", "error")
+      showToast("Please add a damage description", "error")
       return
     }
 
     try {
-      let translatedIssue = currentSection.issue
-      let translatedTitle = currentSection.title || ""
-      let translatedDescription = currentSection.description
+      let finalIssue = currentSection.issue.trim()
+      let finalTitle = currentSection.title?.trim() || ""
+      let finalDescription = currentSection.description.trim()
+      const finalSeverity = currentSection.severity
+      const finalPhotos = [...currentSection.photos]
 
-      const spanishInputDetector =
-        /[áéíóúñ¿¡]|\b(no existe|falta|roto|inexistente|dañado|corrosión|tejas|techo|goteras|canaleta|tapajunta|chimenea|humedad|moho)\b/i
+      console.log("[v0] Adding/Updating section with severity:", finalSeverity, "photos:", finalPhotos.length)
 
-      if (spanishInputDetector.test(currentSection.issue)) {
-        translatedIssue = await translateSpanishToEnglish(currentSection.issue)
+      // Translation logic...
+      const hasAccentedChars = /[áéíóúñüÁÉÍÓÚÑÜ¿¡]/.test(finalIssue + finalDescription + finalTitle)
+      const hasSpanishWords =
+        /\b(el|la|los|las|del|de|en|con|por|para|que|es|un|una|techo|daño|agua|grieta|fisura|humedad|goteras?|tejas?|impermeabilizante)\b/i.test(
+          finalIssue + finalDescription + finalTitle,
+        )
+
+      if (hasAccentedChars || hasSpanishWords) {
+        const translateResult = await translateSpanishToEnglish(finalIssue, finalDescription, finalTitle)
+        if (translateResult) {
+          finalIssue = translateResult.issue
+          finalDescription = translateResult.description
+          finalTitle = translateResult.title || finalTitle
+        }
       }
 
-      if (currentSection.title && spanishInputDetector.test(currentSection.title)) {
-        translatedTitle = await translateSpanishToEnglish(currentSection.title)
-      } else if (currentSection.title) {
-        translatedTitle = currentSection.title
-      } else {
-        translatedTitle = translatedIssue
-      }
+      const cleanAccents = (text: string) =>
+        text
+          .replace(/[áàäâ]/g, "a")
+          .replace(/[éèëê]/g, "e")
+          .replace(/[íìïî]/g, "i")
+          .replace(/[óòöô]/g, "o")
+          .replace(/[úùüû]/g, "u")
+          .replace(/[ñ]/g, "n")
+          .replace(/[ÁÀÄÂ]/g, "A")
+          .replace(/[ÉÈËÊ]/g, "E")
+          .replace(/[ÍÌÏÎ]/g, "I")
+          .replace(/[ÓÒÖÔ]/g, "O")
+          .replace(/[ÚÙÜÛ]/g, "U")
+          .replace(/[Ñ]/g, "N")
+          .replace(/[¿¡]/g, "")
 
-      if (spanishInputDetector.test(currentSection.description)) {
-        translatedDescription = await translateSpanishToEnglish(currentSection.description)
-      }
+      finalIssue = cleanAccents(finalIssue)
+      finalDescription = cleanAccents(finalDescription)
+      finalTitle = cleanAccents(finalTitle)
 
-      const strictSpanishDetector = /[áéíóúñ¿¡]/i
-
-      if (
-        strictSpanishDetector.test(translatedIssue) ||
-        strictSpanishDetector.test(translatedTitle) ||
-        strictSpanishDetector.test(translatedDescription)
-      ) {
-        const cleanAccents = (str: string) =>
-          str
-            .replace(/[áÁ]/g, "a")
-            .replace(/[éÉ]/g, "e")
-            .replace(/[íÍ]/g, "i")
-            .replace(/[óÓ]/g, "o")
-            .replace(/[úÚ]/g, "u")
-            .replace(/[ñÑ]/g, "n")
-            .replace(/[¿¡]/g, "")
-
-        translatedIssue = cleanAccents(translatedIssue)
-        translatedTitle = cleanAccents(translatedTitle)
-        translatedDescription = cleanAccents(translatedDescription)
-      }
-
-      const cleanIssue = translatedIssue
+      const cleanTitle = finalTitle
         .replace(/["""]/g, "")
         .replace(/\s+/g, " ")
         .trim()
         .replace(/^(.)/, (c) => c.toUpperCase())
 
-      const cleanTitle = translatedTitle
-        .replace(/["""]/g, "")
-        .replace(/\s+/g, " ")
-        .trim()
-        .replace(/^(.)/, (c) => c.toUpperCase())
-
-      const cleanDescription = translatedDescription.replace(/["""]/g, "").replace(/\s+/g, " ").trim()
+      const cleanDescription = finalDescription.replace(/["""]/g, "").replace(/\s+/g, " ").trim()
 
       const newSection: Section = {
         id: editingSection?.id || crypto.randomUUID(),
-        issue: cleanIssue,
+        issue: finalIssue,
         title: cleanTitle,
         description: cleanDescription,
-        severity: currentSection.severity,
-        photos: currentSection.photos,
+        severity: finalSeverity,
+        photos: finalPhotos,
       }
+
+      console.log(
+        "[v0] Final section to save:",
+        newSection.id,
+        "Severity:",
+        newSection.severity,
+        "Photos:",
+        newSection.photos.length,
+      )
 
       if (editingSection) {
         const currentSections = getValues("sections") || []
         const updatedSections = currentSections.map((s) => (s.id === editingSection.id ? newSection : s))
-        setValue("sections", updatedSections)
+        setValue("sections", updatedSections, { shouldDirty: true })
         setEditingSection(null)
         showToast("Section updated!", "success")
       } else {
@@ -618,8 +620,24 @@ export default function ReportGenerator() {
   }
 
   const editSection = (section: Section) => {
-    setCurrentSection(section)
-    setEditingSection(section)
+    const sectionCopy: Section = {
+      id: section.id,
+      issue: section.issue,
+      title: section.title || "",
+      description: section.description,
+      severity: section.severity,
+      photos: [...section.photos], // Clone the photos array
+    }
+    console.log(
+      "[v0] Editing section:",
+      sectionCopy.id,
+      "Severity:",
+      sectionCopy.severity,
+      "Photos:",
+      sectionCopy.photos.length,
+    )
+    setCurrentSection(sectionCopy)
+    setEditingSection(sectionCopy)
   }
 
   const deleteSection = (id: string) => {

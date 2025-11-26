@@ -17,7 +17,7 @@ interface ReportPreviewProps {
   estimator: string
   sections: Section[]
   finalNotes: string
-  id?: string // Added id prop for PDF generation targeting
+  id?: string
 }
 
 export const ReportPreview = forwardRef(function ReportPreview(
@@ -33,7 +33,7 @@ export const ReportPreview = forwardRef(function ReportPreview(
     estimator,
     sections,
     finalNotes,
-    id, // Added id prop
+    id,
   }: ReportPreviewProps,
   ref: ForwardedRef<HTMLDivElement>,
 ) {
@@ -62,7 +62,7 @@ export const ReportPreview = forwardRef(function ReportPreview(
               src={logoUrl || "/placeholder.svg"}
               alt="EHL Logo"
               crossOrigin="anonymous"
-              style={{ height: "80px", width: "auto", objectFit: "contain" }} // Increased height for better visibility
+              style={{ height: "80px", width: "auto", objectFit: "contain" }}
             />
             <div>
               <h1 style={{ fontSize: "20px", fontWeight: "700" }}>Roof Inspection Report — {company}</h1>
@@ -70,21 +70,29 @@ export const ReportPreview = forwardRef(function ReportPreview(
             </div>
           </div>
 
-          {/* Customer Info */}
+          {/* Customer Info - Fixed layout to prevent text clipping */}
           {(customerName || customerEmail) && (
             <div
               data-pdf-section="customer"
               style={{ marginTop: "16px", paddingTop: "16px", borderTop: "1px solid #e5e7eb" }}
             >
               <h3 style={{ fontSize: "16px", fontWeight: "600", marginBottom: "8px" }}>Customer Information</h3>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", fontSize: "14px" }}>
+              <div
+                style={{
+                  display: "flex",
+                  flexWrap: "wrap",
+                  gap: "16px",
+                  fontSize: "14px",
+                  lineHeight: "1.6",
+                }}
+              >
                 {customerName && (
-                  <div>
+                  <div style={{ minWidth: "200px", flex: "1 1 45%" }}>
                     <span style={{ fontWeight: "600" }}>Name:</span> {customerName}
                   </div>
                 )}
                 {customerEmail && (
-                  <div>
+                  <div style={{ minWidth: "200px", flex: "1 1 45%", wordBreak: "break-word" }}>
                     <span style={{ fontWeight: "600" }}>Email:</span> {customerEmail}
                   </div>
                 )}
@@ -92,22 +100,30 @@ export const ReportPreview = forwardRef(function ReportPreview(
             </div>
           )}
 
-          {/* Inspection Info */}
+          {/* Inspection Info - Fixed layout to prevent text clipping */}
           <div
             data-pdf-section="inspection-info"
             style={{ marginTop: "16px", paddingTop: "16px", borderTop: "1px solid #e5e7eb" }}
           >
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px", fontSize: "14px" }}>
-              <div>
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: "12px 24px",
+                fontSize: "14px",
+                lineHeight: "1.8",
+              }}
+            >
+              <div style={{ minWidth: "200px", flex: "1 1 45%" }}>
                 <span style={{ fontWeight: "600" }}>Address:</span> {address || "—"}
               </div>
-              <div>
+              <div style={{ minWidth: "200px", flex: "1 1 45%" }}>
                 <span style={{ fontWeight: "600" }}>Inspection Date:</span> {date}
               </div>
-              <div>
+              <div style={{ minWidth: "200px", flex: "1 1 45%" }}>
                 <span style={{ fontWeight: "600" }}>Inspector:</span> {inspector}
               </div>
-              <div>
+              <div style={{ minWidth: "200px", flex: "1 1 45%" }}>
                 <span style={{ fontWeight: "600" }}>Estimator:</span> {estimator}
               </div>
             </div>
@@ -147,11 +163,13 @@ export const ReportPreview = forwardRef(function ReportPreview(
                       style={{
                         display: "flex",
                         justifyContent: "space-between",
-                        alignItems: "center",
+                        alignItems: "flex-start",
                         marginBottom: "12px",
+                        gap: "12px",
+                        flexWrap: "wrap",
                       }}
                     >
-                      <h3 style={{ fontSize: "16px", fontWeight: "600" }}>
+                      <h3 style={{ fontSize: "16px", fontWeight: "600", flex: "1 1 auto" }}>
                         {i + 1}. {s.title || s.issue}
                       </h3>
                       <span
@@ -162,6 +180,7 @@ export const ReportPreview = forwardRef(function ReportPreview(
                           fontWeight: "500",
                           backgroundColor: getSeverityBgColor(s.severity),
                           color: "#ffffff",
+                          whiteSpace: "nowrap",
                         }}
                       >
                         {s.severity}

@@ -1,3 +1,5 @@
+"use client"
+
 import type React from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -5,12 +7,12 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { X, StopCircle } from 'lucide-react'
+import { X, StopCircle } from "lucide-react"
 import type { Section, Severity } from "@/lib/types"
 
 interface SectionBuilderProps {
   currentSection: Section
-  editingId: string | null
+  editingSection: Section | null
   isRecordingIssue: boolean
   isTranscribingIssue: boolean
   isGeneratingDesc: boolean
@@ -28,7 +30,7 @@ interface SectionBuilderProps {
 
 export function SectionBuilder({
   currentSection,
-  editingId,
+  editingSection,
   isRecordingIssue,
   isTranscribingIssue,
   isGeneratingDesc,
@@ -43,9 +45,11 @@ export function SectionBuilder({
   onAddSection,
   onCancelEdit,
 }: SectionBuilderProps) {
+  const isEditing = editingSection !== null
+
   return (
     <Card className="p-4 sm:p-6">
-      <h2 className="text-xl font-semibold mb-4">{editingId ? "Edit Section" : "Agregar Problema/daño:"}</h2>
+      <h2 className="text-xl font-semibold mb-4">{isEditing ? "Edit Section" : "Agregar Problema/daño:"}</h2>
       <div className="space-y-4">
         <div>
           <Label>Daño: *</Label>
@@ -120,11 +124,15 @@ export function SectionBuilder({
           <div>
             <Label>Severity</Label>
             <Select
+              key={`severity-${currentSection.id}-${currentSection.severity}`}
               value={currentSection.severity}
-              onValueChange={(v) => onSectionChange({ ...currentSection, severity: v as Severity })}
+              onValueChange={(v) => {
+                console.log("[v0] Severity changed to:", v)
+                onSectionChange({ ...currentSection, severity: v as Severity })
+              }}
             >
               <SelectTrigger>
-                <SelectValue />
+                <SelectValue placeholder="Select severity" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="Critical">Critical</SelectItem>
@@ -135,8 +143,15 @@ export function SectionBuilder({
             </Select>
           </div>
           <div>
-            <Label>Photos (max 4)</Label>
-            <Input type="file" accept="image/*" multiple onChange={onPhotoUpload} disabled={isUploadingPhotos} />
+            <Label>Photos (max 4) - Current: {currentSection.photos.length}</Label>
+            <Input
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={onPhotoUpload}
+              disabled={isUploadingPhotos}
+              key={`photo-input-${currentSection.id}-${currentSection.photos.length}`}
+            />
             {isUploadingPhotos && compressionProgress && compressionProgress.total > 0 && (
               <div className="mt-2">
                 <p className="text-sm text-blue-600">
@@ -154,26 +169,34 @@ export function SectionBuilder({
         </div>
 
         {currentSection.photos.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {currentSection.photos.map((p, i) => (
-              <div key={i} className="relative">
-                <img src={p || "/placeholder.svg"} alt={`Photo ${i}`} className="w-20 h-20 object-cover rounded" />
-                <button
-                  onClick={() => onRemovePhoto(i)}
-                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </div>
-            ))}
+          <div>
+            <Label className="mb-2 block">Current Photos ({currentSection.photos.length}/4)</Label>
+            <div className="flex flex-wrap gap-2">
+              {currentSection.photos.map((p, i) => (
+                <div key={`photo-${i}-${p.substring(0, 20)}`} className="relative">
+                  <img
+                    src={p || "/placeholder.svg"}
+                    alt={`Photo ${i + 1}`}
+                    className="w-20 h-20 object-cover rounded border"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => onRemovePhoto(i)}
+                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
         <div className="flex gap-2">
           <Button onClick={onAddSection} className="flex-1" disabled={isGeneratingDesc}>
-            {editingId ? "Update Section" : "Add Section"}
+            {isEditing ? "Update Section" : "Add Section"}
           </Button>
-          {editingId && (
+          {isEditing && (
             <Button onClick={onCancelEdit} variant="outline">
               Cancel
             </Button>
