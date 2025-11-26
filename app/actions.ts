@@ -5,26 +5,41 @@ import nodemailer from "nodemailer"
 type Severity = "Critical" | "High" | "Medium" | "Low"
 
 // ================================
-// OpenAI-powered description generation
+// Translation (API-only, always use AI)
 // ================================
-export async function generateDescriptionWithAI(issue: string, severity: Severity) {
+export async function translateSpanishToEnglish(text: string): Promise<string> {
+  if (!text?.trim()) return text
+
   const apiKey = process.env.OPENAI_API_KEY?.trim()
   if (!apiKey) {
-    return {
-      success: false,
-      error: "OpenAI API key not configured",
-    }
+    // If no API key, just return original text - don't block the flow
+    console.warn("[EHL] No API key for translation, returning original text")
+    return text
   }
 
-  const prompt = `You are a professional roofing inspector. Based on this roofing issue, generate BOTH a professional title and a technical description.
+  try {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: `You are a translator. Your ONLY job is to translate text to English.
 
-Issue (${severity} severity): ${issue}
+RULES:
+1. If the input is in Spanish (or any non-English language), translate it to English
+2. If the input is already in English, return it exactly as-is
+3. Output ONLY the translated text - no explanations, no quotes, no prefixes
+4. Use proper roofing industry terminology when translating roofing terms
 
-CRITICAL REQUIREMENT: Write EXCLUSIVELY in English. You MUST translate any Spanish words to English. Do NOT include ANY Spanish words in your output.
-
-COMMON SPANISH TO ENGLISH TRANSLATIONS (use these):
+Common roofing translations:
 - clavos = nails
-- clavos expuestos = exposed nails
+- clavos expuestos = exposed nails  
 - tejas = shingles
 - techo = roof
 - goteras = leaks
@@ -36,20 +51,71 @@ COMMON SPANISH TO ENGLISH TRANSLATIONS (use these):
 - dañado = damaged
 - roto = broken
 - oxidado = rusted
-- agrietado = cracked
+- agrietado = cracked`,
+          },
+          {
+            role: "user",
+            content: text,
+          },
+        ],
+        max_tokens: 200,
+        temperature: 0.1, // Low temperature for consistent translations
+      }),
+    })
+
+    if (!response.ok) {
+      console.error("[EHL] Translation API error")
+      return text // Return original on error
+    }
+
+    const data = await response.json()
+    let translated = data.choices[0]?.message?.content?.trim() || text
+
+    // Clean any formatting artifacts
+    translated = translated
+      .replace(/^["']|["']$/g, "") // Remove surrounding quotes
+      .replace(/^(translation|translated|english|output):\s*/i, "") // Remove prefixes
+      .trim()
+
+    console.log(`[EHL] Translation: "${text}" → "${translated}"`)
+    return translated
+  } catch (error) {
+    console.error("[EHL] Translation error:", error)
+    return text // Return original on error
+  }
+}
+
+// ================================
+// OpenAI-powered description generation
+// ================================
+export async function generateDescriptionWithAI(issue: string, severity: Severity) {
+  const apiKey = process.env.OPENAI_API_KEY?.trim()
+  if (!apiKey) {
+    return {
+      success: false,
+      error: "OpenAI API key not configured",
+    }
+  }
+
+  const translatedIssue = await translateSpanishToEnglish(issue)
+  console.log(`[EHL] Generating description for: "${translatedIssue}" (original: "${issue}")`)
+
+  const prompt = `You are a professional roofing inspector. Generate a professional title and technical description for this roofing issue.
+
+Issue (${severity} severity): ${translatedIssue}
 
 FORMAT YOUR RESPONSE EXACTLY LIKE THIS:
 
 TITLE:
-[Write a concise, professional title IN ENGLISH ONLY. 5-10 words maximum. Use Title Case. Translate any Spanish terms to English.]
+[Write a concise, professional title. 5-10 words maximum. Use Title Case.]
 
 OBSERVED CONDITION:
-[Precise technical observation in English. 2-3 sentences. All Spanish terms MUST be translated.]
+[Precise technical observation. 2-3 sentences.]
 
 POTENTIAL IMPACT IF UNADDRESSED:
-[Clear explanation of consequences in English. 2-3 sentences.]
+[Clear explanation of consequences. 2-3 sentences.]
 
-Use professional roofing terminology in English only. No markdown. Each section must be its own paragraph separated by a blank line.`
+Use professional roofing terminology. No markdown. Each section must be its own paragraph separated by a blank line.`
 
   try {
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -404,180 +470,6 @@ export async function transcribeAudioWithWhisper(audioBase64: string, language: 
       success: false,
       error: err instanceof Error ? err.message : "Audio transcription failed",
     }
-  }
-}
-
-// ================================
-// Translation (API-only, robust validation)
-// ================================
-export async function translateSpanishToEnglish(text: string): Promise<string> {
-  if (!text?.trim()) return text
-
-  const apiKey = process.env.OPENAI_API_KEY?.trim()
-  if (!apiKey) {
-    throw new Error("Translation requires OpenAI API key")
-  }
-
-  // Spanish detector
-  const hasSpanishChars = /[áéíóúñ¿¡]/i.test(text)
-  const hasSpanishWords =
-    /\b(clavos|expuestos|no|existe|falta|roto|inexistente|dañado|corrosión|tejas|techo|goteras|impermeabilización|canaleta|tapajunta|chimenea|humedad|moho|deteriorado|agrietado|desprendido|suelto|oxidado|podrido|sellador|ventilación|aislamiento|membrana|flasheo|bajante|cumbrera|alero|fascia|sofito)\b/i.test(
-      text,
-    )
-
-  // If clearly English already, return as-is
-  if (!hasSpanishChars && !hasSpanishWords && text.length > 20) {
-    return text
-  }
-
-  try {
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content: `You are a professional translator specializing in roofing industry terminology. 
-
-CRITICAL RULES:
-1. Translate ANY Spanish text to English
-2. Use proper technical roofing terms in English
-3. Output ONLY the English translation - no explanations
-4. If input is already in English, return it unchanged
-5. NEVER include Spanish words in your output
-6. Common Spanish roofing terms:
-   - clavos = nails
-   - clavos expuestos = exposed nails
-   - expuestos = exposed
-   - tapajunta/tapa junta = ridge cap
-   - tejas = shingles
-   - techo = roof
-   - canaleta = gutter
-   - bajante = downspout
-   - chimenea = chimney
-   - goteras = leaks
-   - humedad = moisture
-   - moho = mold
-   - inexistente = missing
-   - dañado = damaged
-   - roto = broken
-   - corrosión = corrosion
-   - oxidado = rusted
-   - agrietado = cracked
-   - deteriorado = deteriorated
-   - desprendido = detached
-   - suelto = loose
-   - podrido = rotten
-   - sellador = sealant
-   - ventilación = ventilation
-   - aislamiento = insulation
-   - membrana = membrane
-   - flasheo = flashing
-   - cumbrera = ridge
-   - alero = eave
-   - fascia = fascia board
-   - sofito = soffit`,
-          },
-          {
-            role: "user",
-            content: text,
-          },
-        ],
-        max_tokens: 200,
-        temperature: 0.2,
-      }),
-    })
-
-    if (!response.ok) {
-      const error = await response.json()
-      throw new Error(`OpenAI API error: ${error.error?.message || "Unknown error"}`)
-    }
-
-    const data = await response.json()
-    let translated = data.choices[0]?.message?.content?.trim() || text
-
-    // Clean formatting
-    translated = translated
-      .replace(/["""]/g, "")
-      .replace(/^(translation|translated text|english|output):\s*/i, "")
-      .replace(/^\*+\s*/g, "")
-      .replace(/\s*\*+$/g, "")
-      .trim()
-
-    // POST-TRANSLATION VALIDATION: Check for remaining Spanish
-    const stillHasSpanish =
-      /[áéíóúÁÉÍÓÚ]|clavos|expuestos|inexistente|dañado|roto|corrosión|tejas(?!\w)|techo(?!\w)|goteras|canaleta|tapajunta|chimenea|humedad|moho/i.test(
-        translated,
-      )
-
-    if (stillHasSpanish) {
-      console.warn("[EHL] Spanish detected in translation, retrying with stronger prompt...")
-
-      const retryResponse = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: "gpt-4o-mini",
-          messages: [
-            {
-              role: "system",
-              content:
-                "You MUST translate to English. NO Spanish words allowed in output. Roofing terminology translator.",
-            },
-            {
-              role: "user",
-              content: `This text still has Spanish words. Translate EVERYTHING to English:\n\n${translated}\n\nOutput ONLY pure English, no Spanish whatsoever.`,
-            },
-          ],
-          max_tokens: 200,
-          temperature: 0.1,
-        }),
-      })
-
-      if (retryResponse.ok) {
-        const retryData = await retryResponse.json()
-        translated =
-          retryData.choices[0]?.message?.content
-            ?.trim()
-            .replace(/["""]/g, "")
-            .replace(/^(translation|translated text|english|output):\s*/i, "")
-            .trim() || translated
-      }
-    }
-
-    // Final cleanup: remove remaining Spanish characters
-    translated = translated
-      .replace(/[áéíóúÁÉÍÓÚ]/g, (c) => {
-        const map: Record<string, string> = {
-          á: "a",
-          é: "e",
-          í: "i",
-          ó: "o",
-          ú: "u",
-          Á: "A",
-          É: "E",
-          Í: "I",
-          Ó: "O",
-          Ú: "U",
-        }
-        return map[c] || c
-      })
-      .replace(/ñ/gi, "n")
-      .replace(/[¿¡]/g, "")
-
-    console.log("[EHL] Translation successful")
-    return translated
-  } catch (error) {
-    console.error("[EHL] Translation error:", error)
-    throw new Error("Translation failed. Please check your internet connection and try again.")
   }
 }
 
