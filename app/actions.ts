@@ -476,24 +476,162 @@ export async function transcribeAudioWithWhisper(audioBase64: string, language: 
 // ================================
 // Email sending
 // ================================
+export async function composeEmailWithAI({
+  customerName,
+  propertyAddress,
+  inspectionDate,
+  inspectorName,
+  sectionsCount,
+  sectionSummaries,
+  additionalInstructions,
+}: {
+  customerName: string
+  propertyAddress: string
+  inspectionDate: string
+  inspectorName: string
+  sectionsCount: number
+  sectionSummaries: { title: string; severity: string }[]
+  additionalInstructions?: string
+}): Promise<{ subject: string; body: string }> {
+  const openaiKey = process.env.OPENAI_API_KEY
+  if (!openaiKey) {
+    // Return a default template if no API key
+    return {
+      subject: `Roof Inspection Report - ${propertyAddress}`,
+      body: `Dear ${customerName || "Homeowner"},
+
+Please find attached the roof inspection report for the property located at ${propertyAddress}.
+
+The inspection was conducted on ${inspectionDate} by ${inspectorName}. A total of ${sectionsCount} issue(s) were documented in this report.
+
+Please review the attached PDF for complete details including photographs and recommendations.
+
+If you have any questions, please don't hesitate to contact us.
+
+Best regards,
+EHL Roofing LLC`,
+    }
+  }
+
+  const severityCounts = sectionSummaries.reduce(
+    (acc, s) => {
+      acc[s.severity] = (acc[s.severity] || 0) + 1
+      return acc
+    },
+    {} as Record<string, number>,
+  )
+
+  const severitySummary = Object.entries(severityCounts)
+    .map(([sev, count]) => `${count} ${sev}`)
+    .join(", ")
+
+  const issuesList = sectionSummaries.map((s) => `- ${s.title} (${s.severity})`).join("\n")
+
+  const prompt = `You are a professional email composer for EHL Roofing LLC, a roofing inspection company.
+
+Compose a professional email to send along with a roof inspection report PDF attachment.
+
+REPORT DETAILS:
+- Customer Name: ${customerName || "Homeowner"}
+- Property Address: ${propertyAddress}
+- Inspection Date: ${inspectionDate}
+- Inspector: ${inspectorName}
+- Issues Found: ${sectionsCount} total (${severitySummary})
+- Issue List:
+${issuesList}
+
+${additionalInstructions ? `ADDITIONAL INSTRUCTIONS FROM USER:\n${additionalInstructions}\n` : ""}
+
+REQUIREMENTS:
+1. Write a professional, courteous email
+2. Mention the attached PDF report
+3. Summarize the severity of findings (without going into detail - the PDF has details)
+4. If there are Critical or High severity issues, express appropriate urgency
+5. Include a call to action (contact us, schedule repairs, etc.)
+6. Keep it concise - 3-4 paragraphs max
+7. Sign off as "EHL Roofing LLC"
+
+Respond in JSON format:
+{
+  "subject": "email subject line",
+  "body": "email body text with line breaks as \\n"
+}`
+
+  try {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${openaiKey}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.7,
+        response_format: { type: "json_object" },
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error("OpenAI API error")
+    }
+
+    const data = await response.json()
+    const content = data.choices?.[0]?.message?.content
+    if (!content) throw new Error("No content")
+
+    const parsed = JSON.parse(content)
+    return {
+      subject: parsed.subject || `Roof Inspection Report - ${propertyAddress}`,
+      body: parsed.body || "",
+    }
+  } catch (err) {
+    console.error("[EHL] AI compose error:", err)
+    // Fallback to template
+    return {
+      subject: `Roof Inspection Report - ${propertyAddress}`,
+      body: `Dear ${customerName || "Homeowner"},
+
+Please find attached the roof inspection report for the property located at ${propertyAddress}.
+
+The inspection was conducted on ${inspectionDate} by ${inspectorName}. A total of ${sectionsCount} issue(s) were documented in this report.
+
+Please review the attached PDF for complete details including photographs and recommendations.
+
+If you have any questions, please don't hesitate to contact us.
+
+Best regards,
+EHL Roofing LLC`,
+    }
+  }
+}
+
 export async function sendReportEmail({
   to,
   cc,
   subject,
   body,
-  pdfBuffer,
+  pdfBase64,
   pdfFileName,
 }: {
   to: string[]
   cc?: string[]
   subject: string
   body: string
-  pdfBuffer: Buffer
+  pdfBase64: string
   pdfFileName: string
 }) {
   if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASSWORD) {
-    return { success: false, error: "Email configuration missing" }
+    console.error("[EHL] Missing SMTP config:", {
+      host: !!process.env.SMTP_HOST,
+      user: !!process.env.SMTP_USER,
+      pass: !!process.env.SMTP_PASSWORD,
+    })
+    return { success: false, error: "Email configuration missing. Please check SMTP settings." }
   }
+
+  // Convert base64 back to Buffer
+  const pdfBuffer = Buffer.from(pdfBase64, "base64")
 
   if (!pdfBuffer || pdfBuffer.length === 0) {
     return { success: false, error: "PDF is empty" }
@@ -509,14 +647,20 @@ export async function sendReportEmail({
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST.trim(),
       port: Number.parseInt(process.env.SMTP_PORT || "465"),
-      secure: true,
+      secure: Number.parseInt(process.env.SMTP_PORT || "465") === 465,
       auth: {
         user: process.env.SMTP_USER.trim(),
         pass: process.env.SMTP_PASSWORD,
       },
+      connectionTimeout: 10000, // 10 second connection timeout
+      socketTimeout: 15000, // 15 second socket timeout
     })
 
-    await transporter.verify()
+    // Verify connection with timeout
+    await Promise.race([
+      transporter.verify(),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("Connection timeout")), 10000)),
+    ])
 
     const info = await transporter.sendMail({
       from: `"EHL Roofing LLC" <${process.env.SMTP_USER}>`,
@@ -530,9 +674,18 @@ export async function sendReportEmail({
 
     console.log("[EHL] Email sent successfully:", info.messageId)
     return { success: true, messageId: info.messageId }
-  } catch (err) {
-    console.error("[EHL] Email error:", err)
-    return { success: false, error: "Failed to send email" }
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : "Unknown error"
+    console.error("[EHL] Email error:", errorMessage)
+
+    if (errorMessage.includes("timeout")) {
+      return { success: false, error: "Connection timeout. Please check SMTP settings." }
+    }
+    if (errorMessage.includes("auth") || errorMessage.includes("credential")) {
+      return { success: false, error: "Authentication failed. Please check email credentials." }
+    }
+
+    return { success: false, error: `Failed to send email: ${errorMessage}` }
   }
 }
 

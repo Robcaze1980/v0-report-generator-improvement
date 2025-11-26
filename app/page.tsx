@@ -4,16 +4,17 @@ import type React from "react"
 import { useState, useRef, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import {
+  generateDescriptionWithAI,
   translateSpanishToEnglish,
-  transcribeAudioWithWhisper,
   sendReportEmail,
+  composeEmailWithAI, // Add new import
   saveInspectionToBaserow,
   loadInspectionFromBaserow,
   listInspectionsFromBaserow,
   deleteInspectionFromBaserow,
-  generateDescriptionWithAI,
   generateFinalNotesWithAI,
   logError, // Imported logError
+  transcribeAudioWithWhisper, // Added import for transcribeAudioWithWhisper
 } from "./actions"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
@@ -97,6 +98,8 @@ export default function ReportGenerator() {
   const [emailSubject, setEmailSubject] = useState("")
   const [emailBody, setEmailBody] = useState("")
   const [isSendingEmail, setIsSendingEmail] = useState(false)
+  const [emailInstructions, setEmailInstructions] = useState("")
+  const [isComposingEmail, setIsComposingEmail] = useState(false)
 
   const [isLoadDialogOpen, setIsLoadDialogOpen] = useState(false)
   const [savedInspections, setSavedInspections] = useState<any[]>([])
@@ -874,40 +877,98 @@ export default function ReportGenerator() {
     }
   }
 
-  const sendEmail = async () => {
-    if (!emailTo.trim()) return showToast("Enter recipient email", "error")
-    setIsSendingEmail(true)
-    const pdf = await generatePDFBuffer()
-    if (!pdf) {
-      setIsSendingEmail(false)
-      showToast("PDF generation failed", "error")
+  const handleComposeWithAI = async () => {
+    const values = getValues()
+    if (!values.address) {
+      showToast("Please enter property address first", "error")
       return
     }
-    const to = emailTo
-      .split(",")
-      .map((e) => e.trim())
-      .filter(Boolean)
-    const cc = emailCc
-      ? emailCc
-          .split(",")
-          .map((e) => e.trim())
-          .filter(Boolean)
-      : undefined
-    const result = await sendReportEmail({
-      to,
-      cc,
-      subject: emailSubject,
-      body: emailBody,
-      pdfBuffer: await pdf.arrayBuffer(),
-      pdfFileName: pdf.name,
-    })
-    if (result.success) {
-      showToast("Email sent successfully!", "success")
-      setIsEmailDialogOpen(false)
-    } else {
-      showToast(result.error || "Email failed", "error")
+
+    setIsComposingEmail(true)
+    try {
+      const sectionSummaries = fields.map((s) => ({
+        title: s.title || "Untitled Issue",
+        severity: s.severity || "Medium",
+      }))
+
+      const result = await composeEmailWithAI({
+        customerName: values.customerName || "",
+        propertyAddress: values.address,
+        inspectionDate: values.date || new Date().toLocaleDateString(),
+        inspectorName: values.inspector || "Inspector",
+        sectionsCount: fields.length,
+        sectionSummaries,
+        additionalInstructions: emailInstructions || undefined,
+      })
+
+      setEmailSubject(result.subject)
+      setEmailBody(result.body)
+      showToast("Email composed with AI", "success")
+    } catch (err) {
+      console.error("[v0] AI compose error:", err)
+      await logError("composeEmailWithAI", err instanceof Error ? err : new Error(String(err)))
+      showToast("Failed to compose email", "error")
+    } finally {
+      setIsComposingEmail(false)
     }
-    setIsSendingEmail(false)
+  }
+
+  const sendEmail = async () => {
+    if (!emailTo.trim()) return showToast("Enter recipient email", "error")
+    if (!emailSubject.trim()) return showToast("Enter email subject", "error")
+    if (!emailBody.trim()) return showToast("Enter email message", "error")
+
+    setIsSendingEmail(true)
+    try {
+      const pdf = await generatePDFBuffer()
+      if (!pdf) {
+        showToast("PDF generation failed", "error")
+        return
+      }
+
+      const to = emailTo
+        .split(",")
+        .map((e) => e.trim())
+        .filter(Boolean)
+      const cc = emailCc
+        ? emailCc
+            .split(",")
+            .map((e) => e.trim())
+            .filter(Boolean)
+        : undefined
+
+      // Convert ArrayBuffer to base64 for server action
+      const arrayBuffer = await pdf.arrayBuffer()
+      const base64 = btoa(new Uint8Array(arrayBuffer).reduce((data, byte) => data + String.fromCharCode(byte), ""))
+
+      const result = await sendReportEmail({
+        to,
+        cc,
+        subject: emailSubject,
+        body: emailBody,
+        pdfBase64: base64,
+        pdfFileName: pdf.name,
+      })
+
+      if (result.success) {
+        showToast("Email sent successfully!", "success")
+        setIsEmailDialogOpen(false)
+        // Reset form
+        setEmailTo("")
+        setEmailCc("")
+        setEmailSubject("")
+        setEmailBody("")
+        setEmailInstructions("")
+      } else {
+        showToast(result.error || "Email failed", "error")
+      }
+    } catch (err) {
+      console.error("[v0] Email send error:", err)
+      await logError("sendReportEmail", err instanceof Error ? err : new Error(String(err)))
+      showToast("Failed to send email", "error")
+    } finally {
+      setIsSendingEmail(false)
+    }
   }
 
   const saveInspection = async () => {
@@ -1282,12 +1343,12 @@ export default function ReportGenerator() {
           </div>
         </div>
 
-        {/* Email Dialog - Improved for mobile */}
+        {/* Email Dialog - Improved with AI Compose */}
         <Dialog open={isEmailDialogOpen} onOpenChange={setIsEmailDialogOpen}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto mx-4 sm:mx-auto">
+          <DialogContent style={{ maxWidth: "42rem", maxHeight: "90vh", overflow: "auto", backgroundColor: "#ffffff" }}>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <svg className="h-5 w-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="h-5 w-5 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -1298,47 +1359,149 @@ export default function ReportGenerator() {
                 Email Inspection Report
               </DialogTitle>
             </DialogHeader>
-            <div className="space-y-4">
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              {/* AI Compose Section */}
+              <div
+                style={{
+                  backgroundColor: "#fef3c7",
+                  borderRadius: "8px",
+                  padding: "16px",
+                  border: "1px solid #fcd34d",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
+                  <svg className="h-5 w-5 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  <span style={{ fontWeight: 600, color: "#92400e" }}>AI Email Composer</span>
+                </div>
+                <div style={{ marginBottom: "12px" }}>
+                  <Label style={{ fontSize: "14px", color: "#78350f" }}>Instructions for AI (optional)</Label>
+                  <Textarea
+                    value={emailInstructions}
+                    onChange={(e) => setEmailInstructions(e.target.value)}
+                    placeholder="E.g., 'Make it urgent - they need repairs before winter', 'Be friendly and offer a discount', 'Mention we can start next week'..."
+                    rows={2}
+                    style={{ marginTop: "4px", backgroundColor: "#ffffff" }}
+                  />
+                </div>
+                <Button
+                  type="button"
+                  onClick={handleComposeWithAI}
+                  disabled={isComposingEmail}
+                  style={{
+                    width: "100%",
+                    backgroundColor: "#f97316",
+                    color: "#ffffff",
+                    border: "none",
+                    padding: "10px 16px",
+                    borderRadius: "6px",
+                    cursor: isComposingEmail ? "wait" : "pointer",
+                    opacity: isComposingEmail ? 0.7 : 1,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "8px",
+                  }}
+                >
+                  {isComposingEmail ? (
+                    <>
+                      <div
+                        style={{
+                          width: "16px",
+                          height: "16px",
+                          border: "2px solid #ffffff",
+                          borderTopColor: "transparent",
+                          borderRadius: "50%",
+                          animation: "spin 1s linear infinite",
+                        }}
+                      />
+                      Composing...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M13 10V3L4 14h7v7l9-11h-7z"
+                        />
+                      </svg>
+                      Compose with AI
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {/* Divider */}
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                <div style={{ flex: 1, height: "1px", backgroundColor: "#e5e7eb" }} />
+                <span style={{ fontSize: "12px", color: "#9ca3af" }}>or write manually</span>
+                <div style={{ flex: 1, height: "1px", backgroundColor: "#e5e7eb" }} />
+              </div>
+
+              {/* Email Fields */}
               <div>
-                <Label className="text-sm font-medium">To *</Label>
+                <Label style={{ fontSize: "14px", fontWeight: 500 }}>To *</Label>
                 <Input
                   value={emailTo}
                   onChange={(e) => setEmailTo(e.target.value)}
                   required
-                  className="touch-target mt-1"
+                  style={{ marginTop: "4px" }}
                   placeholder="recipient@email.com"
                 />
               </div>
               <div>
-                <Label className="text-sm font-medium">CC (optional)</Label>
+                <Label style={{ fontSize: "14px", fontWeight: 500 }}>CC (optional)</Label>
                 <Input
                   value={emailCc}
                   onChange={(e) => setEmailCc(e.target.value)}
-                  className="touch-target mt-1"
+                  style={{ marginTop: "4px" }}
                   placeholder="cc@email.com"
                 />
               </div>
               <div>
-                <Label className="text-sm font-medium">Subject *</Label>
+                <Label style={{ fontSize: "14px", fontWeight: 500 }}>Subject *</Label>
                 <Input
                   value={emailSubject}
                   onChange={(e) => setEmailSubject(e.target.value)}
                   required
-                  className="touch-target mt-1"
+                  style={{ marginTop: "4px" }}
+                  placeholder="Roof Inspection Report"
                 />
               </div>
               <div>
-                <Label className="text-sm font-medium">Message *</Label>
+                <Label style={{ fontSize: "14px", fontWeight: 500 }}>Message *</Label>
                 <Textarea
                   value={emailBody}
                   onChange={(e) => setEmailBody(e.target.value)}
                   rows={8}
                   required
-                  className="touch-target mt-1"
+                  style={{ marginTop: "4px" }}
+                  placeholder="Email body..."
                 />
               </div>
-              <div className="flex items-center gap-2 text-sm text-green-600 bg-green-50 p-3 rounded-lg">
-                <svg className="h-5 w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+
+              {/* PDF Attachment Notice */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  fontSize: "14px",
+                  color: "#059669",
+                  backgroundColor: "#ecfdf5",
+                  padding: "12px",
+                  borderRadius: "8px",
+                }}
+              >
+                <svg
+                  style={{ width: "20px", height: "20px", flexShrink: 0 }}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
@@ -1348,24 +1511,53 @@ export default function ReportGenerator() {
                 </svg>
                 PDF report will be attached automatically
               </div>
-              <div className="flex flex-col-reverse sm:flex-row gap-2 justify-end pt-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setIsEmailDialogOpen(false)}
-                  disabled={isSendingEmail}
-                  className="touch-target"
-                >
+
+              {/* Action Buttons */}
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "row",
+                  gap: "8px",
+                  justifyContent: "flex-end",
+                  paddingTop: "8px",
+                }}
+              >
+                <Button variant="outline" onClick={() => setIsEmailDialogOpen(false)} disabled={isSendingEmail}>
                   Cancel
                 </Button>
-                <Button onClick={sendEmail} disabled={isSendingEmail} className="touch-target gap-2">
+                <Button
+                  onClick={sendEmail}
+                  disabled={isSendingEmail || !emailTo.trim() || !emailSubject.trim() || !emailBody.trim()}
+                  style={{
+                    backgroundColor: "#f97316",
+                    color: "#ffffff",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                  }}
+                >
                   {isSendingEmail ? (
                     <>
-                      <div className="h-4 w-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                      <div
+                        style={{
+                          width: "16px",
+                          height: "16px",
+                          border: "2px solid #ffffff",
+                          borderTopColor: "transparent",
+                          borderRadius: "50%",
+                          animation: "spin 1s linear infinite",
+                        }}
+                      />
                       Sending...
                     </>
                   ) : (
                     <>
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <svg
+                        style={{ width: "16px", height: "16px" }}
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
                         <path
                           strokeLinecap="round"
                           strokeLinejoin="round"
