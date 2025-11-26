@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button"
 import {
   translateSpanishToEnglish,
   transcribeAudioWithWhisper,
-  generateEmailContent,
   sendReportEmail,
   saveInspectionToBaserow,
   loadInspectionFromBaserow,
@@ -73,7 +72,7 @@ export default function ReportGenerator() {
     severity: "Medium",
     photos: [],
   })
-  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editingSection, setEditingSection] = useState<Section | null>(null)
 
   // Voice recording states
   const [isRecordingNotes, setIsRecordingNotes] = useState(false)
@@ -200,13 +199,13 @@ export default function ReportGenerator() {
   const compressImage = async (file: File, index: number): Promise<string> => {
     return new Promise((resolve, reject) => {
       // Fallback to canvas-based compression if Worker is not supported
-      if (typeof Worker === 'undefined') {
+      if (typeof Worker === "undefined") {
         const reader = new FileReader()
         reader.onload = (e) => {
           const img = new Image()
           img.onload = () => {
-            const canvas = document.createElement('canvas')
-            const ctx = canvas.getContext('2d')
+            const canvas = document.createElement("canvas")
+            const ctx = canvas.getContext("2d")
             const maxSize = 1200
             let width = img.width
             let height = img.height
@@ -222,7 +221,7 @@ export default function ReportGenerator() {
             canvas.width = width
             canvas.height = height
             ctx?.drawImage(img, 0, 0, width, height)
-            const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.8)
+            const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.8)
             resolve(compressedDataUrl)
           }
           img.onerror = reject
@@ -234,8 +233,8 @@ export default function ReportGenerator() {
       }
 
       // Use Web Worker for better performance
-      const worker = new Worker('/image-worker.js')
-      
+      const worker = new Worker("/image-worker.js")
+
       worker.onmessage = (e) => {
         if (e.data.success) {
           resolve(e.data.dataUrl)
@@ -279,8 +278,8 @@ export default function ReportGenerator() {
         } catch (err) {
           console.error(`[v0] Failed to compress image ${i}:`, err)
           await logError({
-            message: 'Image compression failed',
-            context: 'handlePhotoUpload',
+            message: "Image compression failed",
+            context: "handlePhotoUpload",
             error: err,
             metadata: { imageIndex: i, fileName: filesToProcess[i].name },
           })
@@ -288,22 +287,22 @@ export default function ReportGenerator() {
       }
 
       if (newPhotos.length > 0) {
-        setCurrentSection((prev) => ({ 
-          ...prev, 
-          photos: [...prev.photos, ...newPhotos].slice(0, 4) 
+        setCurrentSection((prev) => ({
+          ...prev,
+          photos: [...prev.photos, ...newPhotos].slice(0, 4),
         }))
-        showToast(`${newPhotos.length} photo(s) compressed successfully`, 'success')
+        showToast(`${newPhotos.length} photo(s) compressed successfully`, "success")
       } else {
-        showToast('Failed to compress images. Please try again.', 'error')
+        showToast("Failed to compress images. Please try again.", "error")
       }
     } catch (err) {
-      console.error('[v0] Photo upload error:', err)
+      console.error("[v0] Photo upload error:", err)
       await logError({
-        message: 'Photo upload failed',
-        context: 'handlePhotoUpload',
+        message: "Photo upload failed",
+        context: "handlePhotoUpload",
         error: err,
       })
-      showToast('Error uploading photos. Please try again.', 'error')
+      showToast("Error uploading photos. Please try again.", "error")
     } finally {
       setIsUploadingPhotos(false)
       setCompressionProgress({ current: 0, total: 0 })
@@ -358,9 +357,7 @@ export default function ReportGenerator() {
       const stream = await navigator.mediaDevices.getUserMedia({
         audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
       })
-      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-        ? "audio/webm;codecs=opus"
-        : "audio/webm"
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? "audio/webm;codecs=opus" : "audio/webm"
       const mediaRecorder = new MediaRecorder(stream, { mimeType })
       issueMediaRecorderRef.current = mediaRecorder
       issueAudioChunksRef.current = []
@@ -491,10 +488,7 @@ export default function ReportGenerator() {
           if (result.success && result.transcript) {
             const translated = await translateSpanishToEnglish(result.transcript)
             const currentFieldNotes = getValues("inspectorFieldNotes") || ""
-            setValue(
-              "inspectorFieldNotes",
-              currentFieldNotes ? `${currentFieldNotes} ${translated}` : translated,
-            )
+            setValue("inspectorFieldNotes", currentFieldNotes ? `${currentFieldNotes} ${translated}` : translated)
             showToast("Voice note transcribed and added", "success")
           } else {
             showToast(result.error || "Failed to transcribe audio", "error")
@@ -527,21 +521,49 @@ export default function ReportGenerator() {
     }
 
     try {
-      const translatedIssue = await translateSpanishToEnglish(currentSection.issue)
-      const translatedTitle = currentSection.title
-        ? await translateSpanishToEnglish(currentSection.title)
-        : translatedIssue
-      const translatedDescription = await translateSpanishToEnglish(currentSection.description)
+      let translatedIssue = currentSection.issue
+      let translatedTitle = currentSection.title || ""
+      let translatedDescription = currentSection.description
 
-      const spanishDetector =
-        /[áéíóúñ¿¡]|inexistente|dañado|roto|corrosión|tejas(?!\w)|techo(?!\w)|goteras|canaleta|tapajunta|chimenea|humedad|moho/i
+      const spanishInputDetector =
+        /[áéíóúñ¿¡]|\b(no existe|falta|roto|inexistente|dañado|corrosión|tejas|techo|goteras|canaleta|tapajunta|chimenea|humedad|moho)\b/i
+
+      if (spanishInputDetector.test(currentSection.issue)) {
+        translatedIssue = await translateSpanishToEnglish(currentSection.issue)
+      }
+
+      if (currentSection.title && spanishInputDetector.test(currentSection.title)) {
+        translatedTitle = await translateSpanishToEnglish(currentSection.title)
+      } else if (currentSection.title) {
+        translatedTitle = currentSection.title
+      } else {
+        translatedTitle = translatedIssue
+      }
+
+      if (spanishInputDetector.test(currentSection.description)) {
+        translatedDescription = await translateSpanishToEnglish(currentSection.description)
+      }
+
+      const strictSpanishDetector = /[áéíóúñ¿¡]/i
 
       if (
-        spanishDetector.test(translatedIssue) ||
-        spanishDetector.test(translatedTitle) ||
-        spanishDetector.test(translatedDescription)
+        strictSpanishDetector.test(translatedIssue) ||
+        strictSpanishDetector.test(translatedTitle) ||
+        strictSpanishDetector.test(translatedDescription)
       ) {
-        throw new Error("Translation incomplete - Spanish words detected. Please try again.")
+        const cleanAccents = (str: string) =>
+          str
+            .replace(/[áÁ]/g, "a")
+            .replace(/[éÉ]/g, "e")
+            .replace(/[íÍ]/g, "i")
+            .replace(/[óÓ]/g, "o")
+            .replace(/[úÚ]/g, "u")
+            .replace(/[ñÑ]/g, "n")
+            .replace(/[¿¡]/g, "")
+
+        translatedIssue = cleanAccents(translatedIssue)
+        translatedTitle = cleanAccents(translatedTitle)
+        translatedDescription = cleanAccents(translatedDescription)
       }
 
       const cleanIssue = translatedIssue
@@ -558,24 +580,24 @@ export default function ReportGenerator() {
 
       const cleanDescription = translatedDescription.replace(/["""]/g, "").replace(/\s+/g, " ").trim()
 
-      const sectionToAdd = {
-        ...currentSection,
+      const newSection: Section = {
+        id: editingSection?.id || crypto.randomUUID(),
         issue: cleanIssue,
         title: cleanTitle,
         description: cleanDescription,
-        id: currentSection.id || crypto.randomUUID(),
+        severity: currentSection.severity,
+        photos: currentSection.photos,
       }
 
-      if (editingId) {
-        const index = fields.findIndex((f) => f.id === editingId)
-        if (index !== -1) {
-          update(index, sectionToAdd)
-        }
-        setEditingId(null)
-        showToast("Section updated successfully", "success")
+      if (editingSection) {
+        const currentSections = getValues("sections") || []
+        const updatedSections = currentSections.map((s) => (s.id === editingSection.id ? newSection : s))
+        setValue("sections", updatedSections)
+        setEditingSection(null)
+        showToast("Section updated!", "success")
       } else {
-        append(sectionToAdd)
-        showToast("Section added successfully", "success")
+        append(newSection)
+        showToast("Section added!", "success")
       }
 
       setCurrentSection({
@@ -587,14 +609,17 @@ export default function ReportGenerator() {
         photos: [],
       })
     } catch (error) {
-      console.error("[v0] Add section error:", error)
+      console.log("[v0] Add section error:", error instanceof Error ? error.message : "Unknown error")
+      await logError(error instanceof Error ? error.message : "Unknown error", "addSection", {
+        issue: currentSection.issue,
+      })
       showToast(error instanceof Error ? error.message : "Failed to add section", "error")
     }
   }
 
   const editSection = (section: Section) => {
     setCurrentSection(section)
-    setEditingId(section.id)
+    setEditingSection(section)
   }
 
   const deleteSection = (id: string) => {
@@ -614,7 +639,7 @@ export default function ReportGenerator() {
       severity: "Medium",
       photos: [],
     })
-    setEditingId(null)
+    setEditingSection(null)
   }
 
   // Final Notes Generation
@@ -669,20 +694,20 @@ export default function ReportGenerator() {
       const pdfData = {
         company: String(values.company || "EHL Roofing LLC"),
         license: String(values.license || "CA #1145092"),
-        logo: String(values.logo || "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/EHL%20%284%29-P3jjzUnqzwKlyThpWcRe641AhPFonu.png"),
+        logo: String(values.logo || "/images/ehl-20-284-29.png"),
         customerName: String(values.customerName || ""),
         customerEmail: String(values.customerEmail || ""),
         address: String(values.address || ""),
         date: String(values.date || new Date().toISOString().split("T")[0]),
         inspector: String(values.inspector || "Lester Herrera H."),
         estimator: String(values.estimator || " Robertson Carrillo Z."),
-        sections: (values.sections || []).map(s => ({
+        sections: (values.sections || []).map((s) => ({
           id: String(s.id || crypto.randomUUID()),
           issue: String(s.issue || "No issue specified"),
           title: String(s.title || s.issue || "Untitled"),
           description: String(s.description || "No description provided"),
           severity: String(s.severity || "Medium"),
-          photos: Array.isArray(s.photos) ? s.photos.filter(p => p && typeof p === 'string' && p.trim() !== "") : [],
+          photos: Array.isArray(s.photos) ? s.photos.filter((p) => p && typeof p === "string" && p.trim() !== "") : [],
         })),
         finalNotes: String(values.finalNotes || ""),
       }
@@ -714,7 +739,7 @@ export default function ReportGenerator() {
 
   const validateNoSpanish = (sections: Section[], finalNotes: string): { valid: boolean; issues: string[] } => {
     const spanishDetector =
-      /[áéíóúñ¿¡]|inexistente|dañado|roto|corrosión|tejas(?!\w)|techo(?!\w)|goteras|canaleta|tapajunta|chimenea|humedad|moho/i
+      /[áéíóúñ¿¡]|\b(no existe|falta|roto|inexistente|dañado|corrosión|tejas|techo|goteras|canaleta|tapajunta|chimenea|humedad|moho)\b/i
     const issues: string[] = []
     sections.forEach((section, index) => {
       if (spanishDetector.test(section.issue)) issues.push(`Section ${index + 1} Issue: "${section.issue}"`)
@@ -734,21 +759,21 @@ export default function ReportGenerator() {
         showToast("Spanish words detected. Please review.", "error")
         return
       }
-      
+
       const pdf = await generatePDFBuffer()
       if (!pdf) {
         showToast("PDF generation failed. Check console for details.", "error")
         await logError({
           message: "PDF export failed - generatePDFBuffer returned null",
           context: "exportPDF",
-          metadata: { 
+          metadata: {
             hasAddress: !!values.address,
             sectionsCount: values.sections?.length || 0,
           },
         })
         return
       }
-      
+
       const blob = new Blob([pdf.buffer], { type: "application/pdf" })
       const url = URL.createObjectURL(blob)
       const a = document.createElement("a")
@@ -820,7 +845,7 @@ export default function ReportGenerator() {
         ...values,
         finalNotes: values.finalNotes || "",
       })
-      
+
       if (result.success) {
         showToast(`Saved! ID: ${result.id}`, "success")
       } else {
@@ -963,7 +988,7 @@ export default function ReportGenerator() {
 
               <SectionBuilder
                 currentSection={currentSection}
-                editingId={editingId}
+                editingSection={editingSection}
                 isRecordingIssue={isRecordingIssue}
                 isTranscribingIssue={isTranscribingIssue}
                 isGeneratingDesc={isGeneratingDesc}
