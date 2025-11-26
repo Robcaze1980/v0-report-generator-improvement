@@ -20,15 +20,31 @@ export async function generateDescriptionWithAI(issue: string, severity: Severit
 
 Issue (${severity} severity): ${issue}
 
-CRITICAL REQUIREMENT: Write EXCLUSIVELY in English. Do NOT use any Spanish words, phrases, or terminology under any circumstances. The reader only understands English.
+CRITICAL REQUIREMENT: Write EXCLUSIVELY in English. You MUST translate any Spanish words to English. Do NOT include ANY Spanish words in your output.
+
+COMMON SPANISH TO ENGLISH TRANSLATIONS (use these):
+- clavos = nails
+- clavos expuestos = exposed nails
+- tejas = shingles
+- techo = roof
+- goteras = leaks
+- canaleta = gutter
+- tapajunta = ridge cap
+- chimenea = chimney
+- humedad = moisture
+- moho = mold
+- dañado = damaged
+- roto = broken
+- oxidado = rusted
+- agrietado = cracked
 
 FORMAT YOUR RESPONSE EXACTLY LIKE THIS:
 
 TITLE:
-[Write a concise, professional title for this issue. 5-10 words maximum. Use Title Case. Be specific and clear.]
+[Write a concise, professional title IN ENGLISH ONLY. 5-10 words maximum. Use Title Case. Translate any Spanish terms to English.]
 
 OBSERVED CONDITION:
-[Precise technical observation in English. 2-3 sentences.]
+[Precise technical observation in English. 2-3 sentences. All Spanish terms MUST be translated.]
 
 POTENTIAL IMPACT IF UNADDRESSED:
 [Clear explanation of consequences in English. 2-3 sentences.]
@@ -56,7 +72,7 @@ Use professional roofing terminology in English only. No markdown. Each section 
     }
 
     const data = await response.json()
-    let fullText = data.choices[0]?.message?.content?.trim() || ""
+    const fullText = data.choices[0]?.message?.content?.trim() || ""
 
     const titleMatch = fullText.match(/TITLE:\s*\n(.+?)(?=\n\nOBSERVED|$)/is)
     const title = titleMatch ? titleMatch[1].trim() : ""
@@ -352,10 +368,10 @@ export async function transcribeAudioWithWhisper(audioBase64: string, language: 
 
     // ✅ Use native FormData (no npm import needed in Node.js 18+)
     const formData = new FormData()
-    
+
     // ✅ Create Blob using native Blob constructor
     const audioBlob = new Blob([audioBuffer], { type: "audio/webm" })
-    
+
     // Append to FormData
     formData.append("file", audioBlob, "audio.webm")
     formData.append("model", "whisper-1")
@@ -366,7 +382,7 @@ export async function transcribeAudioWithWhisper(audioBase64: string, language: 
 
     const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
       method: "POST",
-      headers: { 
+      headers: {
         Authorization: `Bearer ${apiKey}`,
       },
       body: formData,
@@ -375,18 +391,18 @@ export async function transcribeAudioWithWhisper(audioBase64: string, language: 
     if (!response.ok) {
       const err = await response.json()
       console.error("[EHL] Transcription API error:", err)
-      return { success: false, error: `Transcription failed: ${err.error?.message || 'Unknown error'}` }
+      return { success: false, error: `Transcription failed: ${err.error?.message || "Unknown error"}` }
     }
 
     const data = await response.json()
     console.log("[EHL] Transcription successful:", data.text?.substring(0, 50) + "...")
-    
+
     return { success: true, transcript: data.text }
   } catch (err) {
     console.error("[EHL] Transcription error:", err)
-    return { 
-      success: false, 
-      error: err instanceof Error ? err.message : "Audio transcription failed" 
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Audio transcription failed",
     }
   }
 }
@@ -405,7 +421,7 @@ export async function translateSpanishToEnglish(text: string): Promise<string> {
   // Spanish detector
   const hasSpanishChars = /[áéíóúñ¿¡]/i.test(text)
   const hasSpanishWords =
-    /\b(no|existe|falta|roto|inexistente|dañado|corrosión|tejas|techo|goteras|impermeabilización|canaleta|tapajunta|chimenea|humedad|moho|deteriorado|agrietado|desprendido|suelto|oxidado)\b/i.test(
+    /\b(clavos|expuestos|no|existe|falta|roto|inexistente|dañado|corrosión|tejas|techo|goteras|impermeabilización|canaleta|tapajunta|chimenea|humedad|moho|deteriorado|agrietado|desprendido|suelto|oxidado|podrido|sellador|ventilación|aislamiento|membrana|flasheo|bajante|cumbrera|alero|fascia|sofito)\b/i.test(
       text,
     )
 
@@ -435,8 +451,12 @@ CRITICAL RULES:
 4. If input is already in English, return it unchanged
 5. NEVER include Spanish words in your output
 6. Common Spanish roofing terms:
+   - clavos = nails
+   - clavos expuestos = exposed nails
+   - expuestos = exposed
    - tapajunta/tapa junta = ridge cap
    - tejas = shingles
+   - techo = roof
    - canaleta = gutter
    - bajante = downspout
    - chimenea = chimney
@@ -451,7 +471,17 @@ CRITICAL RULES:
    - agrietado = cracked
    - deteriorado = deteriorated
    - desprendido = detached
-   - suelto = loose`,
+   - suelto = loose
+   - podrido = rotten
+   - sellador = sealant
+   - ventilación = ventilation
+   - aislamiento = insulation
+   - membrana = membrane
+   - flasheo = flashing
+   - cumbrera = ridge
+   - alero = eave
+   - fascia = fascia board
+   - sofito = soffit`,
           },
           {
             role: "user",
@@ -481,7 +511,7 @@ CRITICAL RULES:
 
     // POST-TRANSLATION VALIDATION: Check for remaining Spanish
     const stillHasSpanish =
-      /[áéíóúÁÉÍÓÚ]|inexistente|dañado|roto|corrosión|tejas(?!\w)|techo(?!\w)|goteras|canaleta|tapajunta|chimenea|humedad|moho/i.test(
+      /[áéíóúÁÉÍÓÚ]|clavos|expuestos|inexistente|dañado|roto|corrosión|tejas(?!\w)|techo(?!\w)|goteras|canaleta|tapajunta|chimenea|humedad|moho/i.test(
         translated,
       )
 
@@ -655,7 +685,14 @@ export interface InspectionData {
   inspector: string
   estimator: string
   logo: string | null
-  sections: Array<{ id: string; issue: string; title?: string; description: string; severity: string; photos: string[] }>
+  sections: Array<{
+    id: string
+    issue: string
+    title?: string
+    description: string
+    severity: string
+    photos: string[]
+  }>
   finalNotes?: string
 }
 
@@ -677,7 +714,7 @@ async function fetchWithRetry(url: string, options: RequestInit, retries = 3, ba
     } catch (err) {
       // If last retry, throw the error
       if (i === retries - 1) throw err
-      
+
       // Wait before retrying (exponential backoff)
       await new Promise((resolve) => setTimeout(resolve, backoff * Math.pow(2, i)))
     }
@@ -787,7 +824,7 @@ export async function loadInspectionFromBaserow(id: number) {
     const res = await fetchWithRetry(`${BASEROW_API_URL}/api/database/rows/table/${TABLE_ID}/${id}/`, {
       headers: { Authorization: `Token ${BASEROW_TOKEN}` },
     })
-    
+
     if (!res.ok) {
       const errorMsg = await parseErrorResponse(res)
       throw new Error(errorMsg)
@@ -822,7 +859,7 @@ export async function listInspectionsFromBaserow() {
     const res = await fetchWithRetry(`${BASEROW_API_URL}/api/database/rows/table/${TABLE_ID}/?size=50`, {
       headers: { Authorization: `Token ${BASEROW_TOKEN}` },
     })
-    
+
     if (!res.ok) {
       const errorMsg = await parseErrorResponse(res)
       throw new Error(errorMsg)
@@ -853,12 +890,12 @@ export async function deleteInspectionFromBaserow(id: number) {
       method: "DELETE",
       headers: { Authorization: `Token ${BASEROW_TOKEN}` },
     })
-    
+
     if (!res.ok) {
       const errorMsg = await parseErrorResponse(res)
       throw new Error(errorMsg)
     }
-    
+
     console.log("[EHL] Inspection deleted from Baserow:", id)
     return { success: true, message: "Deleted" }
   } catch (err) {
