@@ -688,20 +688,34 @@ export default function ReportGenerator() {
   // PDF & Email (Simplified for brevity, logic remains similar but uses getValues)
   const generatePDFBuffer = async (): Promise<{ buffer: Buffer; filename: string } | null> => {
     const values = getValues()
-    if (!values.address?.trim() || !values.sections || values.sections.length === 0) return null
+
+    console.log("[v0] generatePDFBuffer called with:", {
+      address: values.address,
+      sectionsCount: values.sections?.length || 0,
+      hasSections: !!values.sections,
+    })
+
+    // More lenient validation - only require address
+    if (!values.address?.trim()) {
+      console.log("[v0] PDF generation skipped: No address provided")
+      return null
+    }
+
+    // Allow PDF generation even with no sections (will just show empty report)
+    const sectionsToUse = values.sections || []
 
     try {
       const pdfData = {
         company: String(values.company || "EHL Roofing LLC"),
         license: String(values.license || "CA #1145092"),
-        logo: String(values.logo || "/images/ehl-20-284-29.png"),
+        logo: "/images/ehl-20-284-29.png",
         customerName: String(values.customerName || ""),
         customerEmail: String(values.customerEmail || ""),
         address: String(values.address || ""),
         date: String(values.date || new Date().toISOString().split("T")[0]),
         inspector: String(values.inspector || "Lester Herrera H."),
         estimator: String(values.estimator || " Robertson Carrillo Z."),
-        sections: (values.sections || []).map((s) => ({
+        sections: sectionsToUse.map((s) => ({
           id: String(s.id || crypto.randomUUID()),
           issue: String(s.issue || "No issue specified"),
           title: String(s.title || s.issue || "Untitled"),
@@ -728,10 +742,10 @@ export default function ReportGenerator() {
     } catch (error) {
       console.error("[v0] PDF Generation Error:", error)
       await logError({
-        message: "PDF generation failed",
+        message: `PDF generation failed: ${error instanceof Error ? error.message : String(error)}`,
         context: "generatePDFBuffer",
         error: error,
-        metadata: { address: values.address, sectionsCount: values.sections?.length },
+        metadata: { address: values.address, sectionsCount: sectionsToUse.length },
       })
       return null
     }
@@ -754,31 +768,41 @@ export default function ReportGenerator() {
   const exportPDF = async () => {
     try {
       const values = getValues()
-      const validation = validateNoSpanish(values.sections || [], values.finalNotes || "")
-      if (!validation.valid) {
-        showToast("Spanish words detected. Please review.", "error")
-        return
+
+      console.log("[v0] exportPDF - values:", {
+        address: values.address,
+        sectionsCount: values.sections?.length || 0,
+      })
+
+      // Skip Spanish validation if no sections
+      if (values.sections && values.sections.length > 0) {
+        const validation = validateNoSpanish(values.sections, values.finalNotes || "")
+        if (!validation.valid) {
+          showToast("Spanish words detected. Please review.", "error")
+          return
+        }
       }
 
-      const pdf = await generatePDFBuffer()
-      if (!pdf) {
-        showToast("PDF generation failed. Check console for details.", "error")
+      const result = await generatePDFBuffer()
+      if (!result) {
+        showToast("PDF generation failed. Make sure you have an address.", "error")
         await logError({
           message: "PDF export failed - generatePDFBuffer returned null",
           context: "exportPDF",
           metadata: {
             hasAddress: !!values.address,
+            addressValue: values.address,
             sectionsCount: values.sections?.length || 0,
           },
         })
         return
       }
 
-      const blob = new Blob([pdf.buffer], { type: "application/pdf" })
+      const blob = new Blob([result.buffer], { type: "application/pdf" })
       const url = URL.createObjectURL(blob)
       const a = document.createElement("a")
       a.href = url
-      a.download = pdf.filename
+      a.download = result.filename
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
