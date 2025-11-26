@@ -686,136 +686,98 @@ export default function ReportGenerator() {
   }
 
   // PDF & Email (Simplified for brevity, logic remains similar but uses getValues)
-  const generatePDFBuffer = async (): Promise<{ buffer: Buffer; filename: string } | null> => {
-    const values = getValues()
+  const generatePDFBuffer = async (): Promise<Blob | null> => {
+    const values = methods.getValues()
 
     console.log("[v0] generatePDFBuffer called with:", {
       address: values.address,
       sectionsCount: values.sections?.length || 0,
-      hasSections: !!values.sections,
+      hasSections: !!values.sections && values.sections.length > 0,
     })
 
-    // More lenient validation - only require address
     if (!values.address?.trim()) {
-      console.log("[v0] PDF generation skipped: No address provided")
-      return null
+      throw new Error("VALIDATION: Please enter an address before exporting the PDF")
     }
 
-    // Allow PDF generation even with no sections (will just show empty report)
-    const sectionsToUse = values.sections || []
+    if (!values.sections || values.sections.length === 0) {
+      throw new Error("VALIDATION: Please add at least one section before exporting the PDF")
+    }
 
     try {
+      const logoUrl = "/images/ehl-20-284-29.png"
+
+      const safeSections = values.sections.map((section) => ({
+        issue: String(section.issue || ""),
+        title: String(section.title || section.issue || ""),
+        description: String(section.description || ""),
+        severity: String(section.severity || "Medium"),
+        photos: Array.isArray(section.photos) ? section.photos.map(String) : [],
+      }))
+
       const pdfData = {
         company: String(values.company || "EHL Roofing LLC"),
-        license: String(values.license || "CA #1145092"),
-        logo: "/images/ehl-20-284-29.png",
+        license: String(values.license || ""),
+        logo: logoUrl,
         customerName: String(values.customerName || ""),
         customerEmail: String(values.customerEmail || ""),
         address: String(values.address || ""),
         date: String(values.date || new Date().toISOString().split("T")[0]),
-        inspector: String(values.inspector || "Lester Herrera H."),
-        estimator: String(values.estimator || " Robertson Carrillo Z."),
-        sections: sectionsToUse.map((s) => ({
-          id: String(s.id || crypto.randomUUID()),
-          issue: String(s.issue || "No issue specified"),
-          title: String(s.title || s.issue || "Untitled"),
-          description: String(s.description || "No description provided"),
-          severity: String(s.severity || "Medium"),
-          photos: Array.isArray(s.photos) ? s.photos.filter((p) => p && typeof p === "string" && p.trim() !== "") : [],
-        })),
+        inspector: String(values.inspector || ""),
+        estimator: String(values.estimator || ""),
+        sections: safeSections,
         finalNotes: String(values.finalNotes || ""),
+        inspectorFieldNotes: String(values.inspectorFieldNotes || ""),
       }
 
-      console.log("[v0] Generating PDF with data:", {
-        sectionsCount: pdfData.sections.length,
-        hasLogo: !!pdfData.logo,
-        address: pdfData.address,
-      })
+      console.log("[v0] Creating PDF with data:", JSON.stringify(pdfData, null, 2))
 
       const blob = await pdf(<InspectionPDF {...pdfData} />).toBlob()
-
-      const buffer = Buffer.from(await blob.arrayBuffer())
-      const filename = `EHL_Roofing_Inspection_${pdfData.date.replace(/-/g, "")}_${pdfData.address.split(",")[0]?.replace(/\W+/g, "_") || "Address"}.pdf`
-
-      console.log("[v0] PDF generated successfully:", filename)
-      return { buffer, filename }
+      console.log("[v0] PDF blob created successfully, size:", blob.size)
+      return blob
     } catch (error) {
       console.error("[v0] PDF Generation Error:", error)
-      await logError({
-        message: `PDF generation failed: ${error instanceof Error ? error.message : String(error)}`,
-        context: "generatePDFBuffer",
-        error: error,
-        metadata: { address: values.address, sectionsCount: sectionsToUse.length },
+      await logError("generatePDFBuffer", error instanceof Error ? error : new Error(String(error)), {
+        address: values.address,
+        sectionsCount: values.sections?.length || 0,
       })
-      return null
+      throw error // Re-throw to be handled by caller
     }
-  }
-
-  const validateNoSpanish = (sections: Section[], finalNotes: string): { valid: boolean; issues: string[] } => {
-    const spanishDetector =
-      /[áéíóúñ¿¡]|\b(no existe|falta|roto|inexistente|dañado|corrosión|tejas|techo|goteras|canaleta|tapajunta|chimenea|humedad|moho)\b/i
-    const issues: string[] = []
-    sections.forEach((section, index) => {
-      if (spanishDetector.test(section.issue)) issues.push(`Section ${index + 1} Issue: "${section.issue}"`)
-      if (spanishDetector.test(section.description)) issues.push(`Section ${index + 1} Description contains Spanish`)
-      if (section.title && spanishDetector.test(section.title))
-        issues.push(`Section ${index + 1} Title contains Spanish`)
-    })
-    if (spanishDetector.test(finalNotes)) issues.push("Final Notes contain Spanish")
-    return { valid: issues.length === 0, issues }
   }
 
   const exportPDF = async () => {
     try {
-      const values = getValues()
-
+      const values = methods.getValues()
       console.log("[v0] exportPDF - values:", {
         address: values.address,
         sectionsCount: values.sections?.length || 0,
       })
 
-      // Skip Spanish validation if no sections
-      if (values.sections && values.sections.length > 0) {
-        const validation = validateNoSpanish(values.sections, values.finalNotes || "")
-        if (!validation.valid) {
-          showToast("Spanish words detected. Please review.", "error")
-          return
-        }
-      }
+      const blob = await generatePDFBuffer()
 
-      const result = await generatePDFBuffer()
-      if (!result) {
-        showToast("PDF generation failed. Make sure you have an address.", "error")
-        await logError({
-          message: "PDF export failed - generatePDFBuffer returned null",
-          context: "exportPDF",
-          metadata: {
-            hasAddress: !!values.address,
-            addressValue: values.address,
-            sectionsCount: values.sections?.length || 0,
-          },
-        })
+      if (!blob) {
+        showToast("PDF generation failed. Please try again.", "error")
         return
       }
 
-      const blob = new Blob([result.buffer], { type: "application/pdf" })
       const url = URL.createObjectURL(blob)
       const a = document.createElement("a")
       a.href = url
-      a.download = result.filename
+      a.download = `inspection-report-${values.address?.replace(/[^a-zA-Z0-9]/g, "-") || "report"}.pdf`
       document.body.appendChild(a)
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
-      showToast("PDF exported successfully", "success")
+
+      showToast("PDF exported successfully!", "success")
     } catch (error) {
-      console.error("[v0] Export PDF error:", error)
-      await logError({
-        message: "PDF export failed with exception",
-        context: "exportPDF",
-        error: error,
-      })
-      showToast("Failed to export PDF. Please try again.", "error")
+      console.error("[v0] Export PDF Error:", error)
+
+      if (error instanceof Error && error.message.startsWith("VALIDATION:")) {
+        showToast(error.message.replace("VALIDATION: ", ""), "error")
+      } else {
+        await logError("exportPDF", error instanceof Error ? error : new Error(String(error)))
+        showToast("Failed to export PDF. Please try again.", "error")
+      }
     }
   }
 
@@ -843,8 +805,8 @@ export default function ReportGenerator() {
       cc,
       subject: emailSubject,
       body: emailBody,
-      pdfBuffer: pdf.buffer,
-      pdfFileName: pdf.filename,
+      pdfBuffer: await pdf.arrayBuffer(),
+      pdfFileName: pdf.name,
     })
     if (result.success) {
       showToast("Email sent successfully!", "success")
@@ -963,6 +925,20 @@ export default function ReportGenerator() {
     localStorage.removeItem("current_inspection")
     showToast("New inspection started", "info")
     setAutoSaveStatus("saved")
+  }
+
+  const validateNoSpanish = (sections: Section[], finalNotes: string): { valid: boolean; issues: string[] } => {
+    const spanishDetector =
+      /[áéíóúñ¿¡]|\b(no existe|falta|roto|inexistente|dañado|corrosión|tejas|techo|goteras|canaleta|tapajunta|chimenea|humedad|moho)\b/i
+    const issues: string[] = []
+    sections.forEach((section, index) => {
+      if (spanishDetector.test(section.issue)) issues.push(`Section ${index + 1} Issue: "${section.issue}"`)
+      if (spanishDetector.test(section.description)) issues.push(`Section ${index + 1} Description contains Spanish`)
+      if (section.title && spanishDetector.test(section.title))
+        issues.push(`Section ${index + 1} Title contains Spanish`)
+    })
+    if (spanishDetector.test(finalNotes)) issues.push("Final Notes contain Spanish")
+    return { valid: issues.length === 0, issues }
   }
 
   return (
