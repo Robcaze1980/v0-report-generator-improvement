@@ -493,6 +493,12 @@ export async function composeEmailWithAI({
   sectionSummaries: { title: string; severity: string }[]
   additionalInstructions?: string
 }): Promise<{ subject: string; body: string }> {
+  const emailSignature = `
+Robertson Carrillo
+EHL Roofing LLC
+(415) 964-9422
+sales@ehlroofing.com`
+
   const openaiKey = process.env.OPENAI_API_KEY
   if (!openaiKey) {
     // Return a default template if no API key
@@ -509,7 +515,7 @@ Please review the attached PDF for complete details including photographs and re
 If you have any questions, please don't hesitate to contact us.
 
 Best regards,
-EHL Roofing LLC`,
+${emailSignature}`,
     }
   }
 
@@ -549,7 +555,12 @@ REQUIREMENTS:
 4. If there are Critical or High severity issues, express appropriate urgency
 5. Include a call to action (contact us, schedule repairs, etc.)
 6. Keep it concise - 3-4 paragraphs max
-7. Sign off as "EHL Roofing LLC"
+7. End the email with EXACTLY this signature (after "Best regards," or similar closing):
+
+Robertson Carrillo
+EHL Roofing LLC
+(415) 964-9422
+sales@ehlroofing.com
 
 Respond in JSON format:
 {
@@ -587,7 +598,7 @@ Respond in JSON format:
     }
   } catch (err) {
     console.error("[EHL] AI compose error:", err)
-    // Fallback to template
+    // Fallback to template with signature
     return {
       subject: `Roof Inspection Report - ${propertyAddress}`,
       body: `Dear ${customerName || "Homeowner"},
@@ -601,7 +612,7 @@ Please review the attached PDF for complete details including photographs and re
 If you have any questions, please don't hesitate to contact us.
 
 Best regards,
-EHL Roofing LLC`,
+${emailSignature}`,
     }
   }
 }
@@ -621,13 +632,23 @@ export async function sendReportEmail({
   pdfBase64: string
   pdfFileName: string
 }) {
+  // Debug: Log which env vars are available
+  console.log("[EHL] SMTP Config check:", {
+    hasHost: !!process.env.SMTP_HOST,
+    hasPort: !!process.env.SMTP_PORT,
+    hasUser: !!process.env.SMTP_USER,
+    hasPass: !!process.env.SMTP_PASSWORD,
+    host: process.env.SMTP_HOST || "NOT SET",
+    port: process.env.SMTP_PORT || "NOT SET",
+    user: process.env.SMTP_USER || "NOT SET",
+  })
+
   if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASSWORD) {
-    console.error("[EHL] Missing SMTP config:", {
-      host: !!process.env.SMTP_HOST,
-      user: !!process.env.SMTP_USER,
-      pass: !!process.env.SMTP_PASSWORD,
-    })
-    return { success: false, error: "Email configuration missing. Please check SMTP settings." }
+    console.error("[EHL] Missing SMTP config")
+    return {
+      success: false,
+      error: "Email configuration missing. Please check SMTP settings in Vercel environment variables.",
+    }
   }
 
   // Convert base64 back to Buffer
@@ -644,26 +665,42 @@ export async function sendReportEmail({
   }
 
   try {
+    const smtpHost = process.env.SMTP_HOST.trim()
+    const smtpPort = Number.parseInt(process.env.SMTP_PORT || "465")
+    const smtpUser = process.env.SMTP_USER.trim()
+    const smtpPass = process.env.SMTP_PASSWORD
+
+    console.log("[EHL] Creating transporter for:", smtpHost, "port:", smtpPort)
+
     const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST.trim(),
-      port: Number.parseInt(process.env.SMTP_PORT || "465"),
-      secure: Number.parseInt(process.env.SMTP_PORT || "465") === 465,
+      host: smtpHost,
+      port: smtpPort,
+      secure: smtpPort === 465, // true for 465 (SSL), false for 587 (TLS)
       auth: {
-        user: process.env.SMTP_USER.trim(),
-        pass: process.env.SMTP_PASSWORD,
+        user: smtpUser,
+        pass: smtpPass,
       },
-      connectionTimeout: 10000, // 10 second connection timeout
-      socketTimeout: 15000, // 15 second socket timeout
+      // Hostinger-compatible timeout settings
+      connectionTimeout: 30000, // 30 seconds
+      greetingTimeout: 30000,
+      socketTimeout: 60000, // 60 seconds for sending (PDFs can be large)
+      tls: {
+        rejectUnauthorized: false, // Allow self-signed certs
+      },
     })
+
+    console.log("[EHL] Verifying SMTP connection...")
 
     // Verify connection with timeout
     await Promise.race([
       transporter.verify(),
-      new Promise((_, reject) => setTimeout(() => reject(new Error("Connection timeout")), 10000)),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("SMTP connection timeout after 30s")), 30000)),
     ])
 
+    console.log("[EHL] SMTP verified, sending email to:", to.join(", "))
+
     const info = await transporter.sendMail({
-      from: `"EHL Roofing LLC" <${process.env.SMTP_USER}>`,
+      from: `"EHL Roofing LLC" <${smtpUser}>`,
       to: to.join(", "),
       cc: cc?.length ? cc.join(", ") : undefined,
       subject,
@@ -679,13 +716,19 @@ export async function sendReportEmail({
     console.error("[EHL] Email error:", errorMessage)
 
     if (errorMessage.includes("timeout")) {
-      return { success: false, error: "Connection timeout. Please check SMTP settings." }
+      return { success: false, error: "Connection timeout. SMTP server may be blocking the connection." }
     }
-    if (errorMessage.includes("auth") || errorMessage.includes("credential")) {
-      return { success: false, error: "Authentication failed. Please check email credentials." }
+    if (errorMessage.includes("auth") || errorMessage.includes("credential") || errorMessage.includes("535")) {
+      return { success: false, error: "Authentication failed. Check SMTP username and password." }
+    }
+    if (errorMessage.includes("ECONNREFUSED")) {
+      return { success: false, error: "Connection refused. Check SMTP host and port." }
+    }
+    if (errorMessage.includes("certificate")) {
+      return { success: false, error: "SSL certificate error. Contact support." }
     }
 
-    return { success: false, error: `Failed to send email: ${errorMessage}` }
+    return { success: false, error: `Failed to send: ${errorMessage}` }
   }
 }
 
