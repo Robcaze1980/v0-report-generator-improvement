@@ -4,13 +4,22 @@ import nodemailer from "nodemailer"
 
 type Severity = "Critical" | "High" | "Medium" | "Low"
 
+function debugEnvVar(name: string): string | undefined {
+  const value = process.env[name]
+  const exists = value !== undefined
+  const isEmpty = value === ""
+  const trimmedLength = value?.trim().length || 0
+  console.log(`[v0] ENV ${name}: exists=${exists}, isEmpty=${isEmpty}, trimmedLength=${trimmedLength}`)
+  return value?.trim()
+}
+
 // ================================
 // Translation (API-only, always use AI)
 // ================================
 export async function translateSpanishToEnglish(text: string): Promise<string> {
   if (!text?.trim()) return text
 
-  const apiKey = process.env.OPENAI_API_KEY?.trim()
+  const apiKey = debugEnvVar("OPENAI_API_KEY")
   if (!apiKey) {
     // If no API key, just return original text - don't block the flow
     console.warn("[EHL] No API key for translation, returning original text")
@@ -89,7 +98,7 @@ Common roofing translations:
 // OpenAI-powered description generation
 // ================================
 export async function generateDescriptionWithAI(issue: string, severity: Severity) {
-  const apiKey = process.env.OPENAI_API_KEY?.trim()
+  const apiKey = debugEnvVar("OPENAI_API_KEY")
   if (!apiKey) {
     return {
       success: false,
